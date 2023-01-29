@@ -2,6 +2,10 @@ SRC := writer.c
 TARGET = writer
 OBJS := $(SRC:.c=.o)
 
+CROSS_COMPILE:=
+CC:= $(CROSS_COMPILE)gcc
+
+
 all: $(TARGET)
 
 $(TARGET) : $(OBJS)
