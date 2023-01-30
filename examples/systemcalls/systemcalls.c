@@ -16,8 +16,20 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-
-    return true;
+    int ret = system(cmd);
+    if(ret == -1)
+    {
+	perror("perror: ");
+	return false;
+    }
+    else if(ret == 0)
+    {
+	return false;
+    }
+    else
+    {
+	return true;
+    }
 }
 
 /**
