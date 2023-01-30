@@ -1,4 +1,6 @@
 #include "systemcalls.h"
+#include <stdlib.h>
+#include <unistd.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -20,10 +22,6 @@ bool do_system(const char *cmd)
     if(ret == -1)
     {
 	perror("perror: ");
-	return false;
-    }
-    else if(ret == 0)
-    {
 	return false;
     }
     else
@@ -70,6 +68,22 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+
+    pid_t pid = fork();
+    if(pid == -1)
+    {
+	perror("perror: fork() ");
+	return false;
+    }
+
+    int ret = execv(command[0], command);
+    if(ret == -1)
+    {
+	perror("perror: execv() ");
+    	return false;
+    }
+    
+
 
     va_end(args);
 
