@@ -82,7 +82,13 @@ bool do_exec(int count, ...)
 	perror("perror: execv() ");
     	return false;
     }
-    
+    int status;
+    pid_t rc = waitpid(-1, &status, 0);
+    if(rc == 0)
+    {
+	perror("perror: waitpid() ");
+    	return false;
+    }
 
 
     va_end(args);
