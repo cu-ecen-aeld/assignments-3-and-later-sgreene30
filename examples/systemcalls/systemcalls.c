@@ -18,16 +18,16 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-    int ret = system(cmd);
-    if(ret == -1)
-    {
-	perror("perror: ");
-	return false;
-    }
-    else
-    {
-	return true;
-    }
+	int ret = system(cmd);
+	if(ret == -1)
+	{
+		ror("perror: ");
+		urn false;
+	}
+	else
+	{
+		urn true;
+	}
 }
 
 /**
@@ -46,18 +46,18 @@ bool do_system(const char *cmd)
 
 bool do_exec(int count, ...)
 {
-    va_list args;
-    va_start(args, count);
-    char * command[count+1];
-    int i;
-    for(i=0; i<count; i++)
-    {
-        command[i] = va_arg(args, char *);
-    }
-    command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
+	va_list args;
+	va_start(args, count);
+	char * command[count+1];
+	int i;
+	for(i=0; i<count; i++)
+	{
+		command[i] = va_arg(args, char *);
+	}
+	command[count] = NULL;
+	// this line is to avoid a compile warning before your implementation is complete
+	// and may be removed
+	command[count] = command[count];
 
 /*
  * TODO:
@@ -69,31 +69,31 @@ bool do_exec(int count, ...)
  *
 */
 
-    pid_t pid = fork();
-    if(pid == -1)
-    {
-	perror("perror: fork() ");
-	return false;
-    }
+	pid_t pid = fork();
+	if(pid == -1)
+	{
+		perror("perror: fork() ");
+		return false;
+    	}
 
-    int ret = execv(command[0], command);
-    if(ret == -1)
-    {
-	perror("perror: execv() ");
-    	return false;
-    }
-    int status;
-    pid_t rc = waitpid(-1, &status, 0);
-    if(rc == 0)
-    {
-	perror("perror: waitpid() ");
-    	return false;
-    }
+	int ret = execv(command[0], command);
+	if(ret == -1)
+	{
+		perror("perror: execv() ");
+    		return false;
+        }
+    	int status;
+    	pid_t rc = waitpid(-1, &status, 0);
+    	if(rc == 0)
+    	{
+		perror("perror: waitpid() ");
+    		return false;
+    	}
 
 
-    va_end(args);
+    	va_end(args);
 
-    return true;
+    	return true;
 }
 
 /**
@@ -103,29 +103,50 @@ bool do_exec(int count, ...)
 */
 bool do_exec_redirect(const char *outputfile, int count, ...)
 {
-    va_list args;
-    va_start(args, count);
-    char * command[count+1];
-    int i;
-    for(i=0; i<count; i++)
-    {
-        command[i] = va_arg(args, char *);
-    }
-    command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
+    	va_list args;
+    	va_start(args, count);
+    	char * command[count+1];
+    	int i;
+    	for(i=0; i<count; i++)
+    	{
+        	command[i] = va_arg(args, char *);
+   	}
+    	command[count] = NULL;
+    	// this line is to avoid a compile warning before your implementation is complete
+    	// and may be removed
+    	command[count] = command[count];
 
 
-/*
- * TODO
- *   Call execv, but first using https://stackoverflow.com/a/13784315/1446624 as a refernce,
- *   redirect standard out to a file specified by outputfile.
- *   The rest of the behaviour is same as do_exec()
- *
-*/
+	/*
+	* TODO
+	*   Call execv, but first using https://stackoverflow.com/a/13784315/1446624 as a refernce,
+	*   redirect standard out to a file specified by outputfile.
+ 	*   The rest of the behaviour is same as do_exec()
+	*
+	*/
+    	int kidpid;
+    	in fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+    	if(fd < 0)
+	{
+		perror("perror: open() ");
+	}
 
-    va_end(args);
+	switch (kidpid = fork())
+	{
+		case -1: perror("perror: fork() ");
+		case 0:
+			if(dup2(fd, 1) < 0)
+			{
+				perror("perror: dup2() ");
+			}
+			close(fd);
+			execvp(command[0], command);
+			perror("perror: execvp() ");
+		default:
+			close(fd);
+	}
+   		
+    	va_end(args);
 
-    return true;
+    	return true;
 }
