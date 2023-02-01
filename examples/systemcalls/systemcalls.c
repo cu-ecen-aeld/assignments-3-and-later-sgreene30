@@ -1,6 +1,8 @@
 #include "systemcalls.h"
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/wait.h>
+
 
 /**
  * @param cmd the command to execute with system()
@@ -21,12 +23,12 @@ bool do_system(const char *cmd)
 	int ret = system(cmd);
 	if(ret == -1)
 	{
-		ror("perror: ");
-		urn false;
+		perror("perror: ");
+		return false;
 	}
 	else
 	{
-		urn true;
+		return true;
 	}
 }
 
@@ -124,29 +126,30 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  	*   The rest of the behaviour is same as do_exec()
 	*
 	*/
-    	int kidpid;
-    	in fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
-    	if(fd < 0)
-	{
-		perror("perror: open() ");
-	}
 
-	switch (kidpid = fork())
-	{
-		case -1: perror("perror: fork() ");
-		case 0:
-			if(dup2(fd, 1) < 0)
-			{
-				perror("perror: dup2() ");
-			}
-			close(fd);
-			execvp(command[0], command);
-			perror("perror: execvp() ");
-		default:
-			close(fd);
-	}
+    //	int kidpid;
+    //	in fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+    //	if(fd < 0)
+//	{
+//		perror("perror: open() ");
+//	}
+//
+//	switch (kidpid = fork())
+//	{
+//		case -1: perror("perror: fork() ");
+//		case 0:
+//			if(dup2(fd, 1) < 0)
+//			{
+//				perror("perror: dup2() ");
+//			}
+//			close(fd);
+//			execvp(command[0], command);
+//			perror("perror: execvp() ");
+//		default:
+//			close(fd);
+//	}
    		
     	va_end(args);
 
-    	return true;
+   	return true;
 }
