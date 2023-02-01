@@ -77,22 +77,17 @@ bool do_exec(int count, ...)
 		perror("perror: fork() ");
 		return false;
     	}
-
-	int ret = execv(command[0], command);
-	if(ret == -1)
+	if(pid > 0)
 	{
+		int status;
+		waitpid(-1, &status, 0);
+	}
+	else
+	{
+		execv(command[0], command);
 		perror("perror: execv() ");
     		return false;
-        }
-    	int status;
-    	pid_t rc = waitpid(-1, &status, 0);
-    	if(rc == 0)
-    	{
-		perror("perror: waitpid() ");
-    		return false;
-    	}
-
-
+	}
     	va_end(args);
 
     	return true;
