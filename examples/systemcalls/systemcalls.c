@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
-
+#include <stdbool.h>
+#include <fcntl.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -59,7 +60,7 @@ bool do_exec(int count, ...)
 	command[count] = NULL;
 	// this line is to avoid a compile warning before your implementation is complete
 	// and may be removed
-	command[count] = command[count];
+	//command[count] = command[count];
 
 /*
  * TODO:
@@ -72,30 +73,34 @@ bool do_exec(int count, ...)
 */
 
 	pid_t pid = fork();
+	int status;
 	if(pid == -1)
 	{
 		perror("perror: fork() ");
 		return false;
     	}
-
-	int ret = execv(command[0], command);
-	if(ret == -1)
+	else if(pid == 0)
 	{
-		perror("perror: execv() ");
-    		return false;
-        }
-    	int status;
-    	pid_t rc = waitpid(-1, &status, 0);
-    	if(rc == 0)
-    	{
-		perror("perror: waitpid() ");
-    		return false;
-    	}
+		printf("\ncommand[0] %s\n", command[0]);
+		execv(command[0], command);
+		//perror("perror: execv() ");
+		//return false;
+		exit(-1);
+	}
+	
+	if(waitpid(pid, &status, 0) == -1)
+	{
+		return false;
+	}
+	else if(WIFEXITED(status))
+	{
+		return WEXITSTATUS(status) == 0;
+	}
 
 
     	va_end(args);
 
-    	return true;
+    	return false;
 }
 
 /**
@@ -127,27 +132,27 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
 	*
 	*/
 
-    //	int kidpid;
-    //	in fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
-    //	if(fd < 0)
-//	{
-//		perror("perror: open() ");
-//	}
-//
-//	switch (kidpid = fork())
-//	{
-//		case -1: perror("perror: fork() ");
-//		case 0:
-//			if(dup2(fd, 1) < 0)
-//			{
-//				perror("perror: dup2() ");
-//			}
-//			close(fd);
-//			execvp(command[0], command);
-//			perror("perror: execvp() ");
-//		default:
-//			close(fd);
-//	}
+   	int kidpid;
+   	int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+   	if(fd < 0)
+	{
+		perror("perror: open() ");
+	}
+
+	switch (kidpid = fork())
+	{
+		case -1: perror("perror: fork() ");
+		case 0:
+			if(dup2(fd, 1) < 0)
+			{
+				perror("perror: dup2() ");
+			}
+			close(fd);
+			execvp(command[0], command);
+			perror("perror: execvp() ");
+		default:
+			close(fd);
+	}
    		
     	va_end(args);
 
