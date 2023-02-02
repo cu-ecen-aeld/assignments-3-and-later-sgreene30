@@ -81,7 +81,7 @@ bool do_exec(int count, ...)
     	}
 	else if(pid == 0)
 	{
-		printf("\ncommand[0] %s\n", command[0]);
+		//printf("\ncommand[0] %s\n", command[0]);
 		execv(command[0], command);
 		//perror("perror: execv() ");
 		//return false;
@@ -134,24 +134,38 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
 
    	int kidpid;
    	int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+
    	if(fd < 0)
 	{
 		perror("perror: open() ");
+		return false;
 	}
 
 	switch (kidpid = fork())
 	{
-		case -1: perror("perror: fork() ");
+		case -1:
+			 perror("perror: fork() ");
+			 return false;
 		case 0:
 			if(dup2(fd, 1) < 0)
 			{
 				perror("perror: dup2() ");
+				return false;
 			}
 			close(fd);
 			execvp(command[0], command);
-			perror("perror: execvp() ");
+			exit(-1);
 		default:
 			close(fd);
+			int status;
+			if(waitpid(kidpid, &status, 0) == -1)
+			{
+				return false;
+			}
+			else if(WIFEXITED(status))
+			{
+				return WEXITSTATUS(status) == 0;
+			}
 	}
    		
     	va_end(args);
