@@ -23,18 +23,35 @@ fi
 
 mkdir -p ${OUTDIR}
 
-cd "$OUTDIR"
+if [ -d $OUTDIR ]
+	then
+	cd "$OUTDIR"
+else
+	echo "Output directory could not be created" 
+	exit 1
+fi
+
 if [ ! -d "${OUTDIR}/linux-stable" ]; then
-    #Clone only if the repository does not exist.
+    	#Clone only if the repository does not exist.
 	echo "CLONING GIT LINUX STABLE VERSION ${KERNEL_VERSION} IN ${OUTDIR}"
 	git clone ${KERNEL_REPO} --depth 1 --single-branch --branch ${KERNEL_VERSION}
 fi
 if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
-    cd linux-stable
-    echo "Checking out version ${KERNEL_VERSION}"
-    git checkout ${KERNEL_VERSION}
+   	cd linux-stable
+    	echo "Checking out version ${KERNEL_VERSION}"
+    	git checkout ${KERNEL_VERSION}
 
-    # TODO: Add your kernel build steps here
+    	# TODO: Add your kernel build steps here
+	echo "1 make"
+	make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} mrproper  #deepclean
+	echo "2 make"
+	make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} defconfig #create default configuration
+	echo "3 make"
+	make -j4 ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} all #build kernel image
+	echo "4 make"
+	make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} modules #build kernel modules
+	echo "5 make"
+	make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} dtbs #
 fi
 
 echo "Adding the Image in outdir"
