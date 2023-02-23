@@ -10,6 +10,38 @@
 
 void* threadfunc(void* thread_param)
 {
+	struct thread_data* td = (struct thread_data *) thread_param;
+	int rc = usleep(td->wait_to_obtain_ms*1000);
+	if(rc != 0)
+	{
+		perror("wait to obtain failed");
+		td->thread_complete_success = false;
+	}
+	
+	if(pthread_mutex_lock(td->mutex) != 0)
+	{
+		perror("mutex lock failed");
+		td->thread_complete_success = false;
+	}
+	else
+	{
+		rc = usleep(td->wait_to_release_ms*1000);
+		if(rc != 0)
+		{
+			perror("wait to release failed");
+			td->thread_complete_success = false;
+		}
+	}
+	
+	if(pthread_mutex_unlock(td->mutex) != 0)
+	{
+		perror("mutex unlock failed");
+		td->thread_complete_success = false;
+	}
+	else
+	{
+		td->thread_complete_success = true;
+	}
 
     // TODO: wait, obtain mutex, wait, release mutex as described by thread_data structure
     // hint: use a cast like the one below to obtain thread arguments from your parameter
@@ -28,6 +60,18 @@ bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int 
      *
      * See implementation details in threading.h file comment block
      */
+    struct thread_data *td = malloc(sizeof *td);
+	td->mutex = mutex;
+	td->wait_to_obtain_ms = wait_to_obtain_ms;
+	td->wait_to_release_ms = wait_to_release_ms;
+
+	int rc = pthread_create(thread, NULL, threadfunc, td);
+    if(rc == 0)
+    {
+        td->thread_complete_success = true;
+        return td->thread_complete_success;
+    }
+    td->thread_complete_success = false;
     return false;
 }
 
