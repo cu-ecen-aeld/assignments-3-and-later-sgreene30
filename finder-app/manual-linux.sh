@@ -102,7 +102,8 @@ make CONFIG_PREFIX=${OUTDIR}/rootfs ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} 
 
 # TODO: Add library dependencies to rootfs
 cd ${OUTDIR}/rootfs
-TOOLCHAIN=/home/sgreene30/aarch64/install-lnx/gcc-arm-10.2-2020.11-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc
+#TOOLCHAIN=/home/sgreene30/aarch64/install-lnx/gcc-arm-10.2-2020.11-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc
+TOOLCHAIN=$(aarch64-none-linux-gnu-gcc -print-sysroot)
 cp ${TOOLCHAIN}/lib/ld-linux-aarch64.so.1 ./lib
 cp ${TOOLCHAIN}/lib64/libm.so.6 ./lib64
 cp ${TOOLCHAIN}/lib64/libresolv.so.2 ./lib64
