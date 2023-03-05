@@ -1,3 +1,8 @@
+/*
+*   AUTHOR: Samuel Greene
+*   Assignment 5 Part 1 of AESD
+*/
+
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netdb.h>
@@ -18,9 +23,6 @@
 #define PORT "9000"
 #define BACKLOG 5
 #define BUF_LEN 1024
-
-//bool caught_sigint = false;
-//bool caught_sigterm = false;
 
 int sock_fd, new_sock_fd; //socket file descriptor for socket()
 
@@ -50,7 +52,7 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     int opt = 1;
     int fd = 0;
@@ -126,6 +128,17 @@ int main()
         return -1;
     }
 
+    //run in daemon mode if argument specified
+    if(argc > 1 && strcmp(argv[1], "-d")==0)
+    {
+        if(daemon(0, 0)==-1)
+        {
+            perror("daemon failure");
+            syslog(LOG_ERR, "daemon failure");
+            exit(1);
+        }
+    }
+
     //free memory to prevent leak
     freeaddrinfo(servinfo);
 
@@ -150,6 +163,7 @@ int main()
     while(1)
     {
         addr_size = sizeof client_addr;
+        //accept connection if found
         new_sock_fd = accept(sock_fd, (struct sockaddr *)&client_addr, &addr_size);
         if(new_sock_fd == -1)
         {
@@ -166,7 +180,7 @@ int main()
                                 
             //print address to syslog and terminal
             syslog(LOG_INFO,"Accepts connection from %s",client_address);
-            printf("Accepts connection from %s\n",client_address);
+            //printf("Accepts connection from %s\n",client_address);
         }
                     
         fd = open("/var/tmp/aesdsocketdata", O_APPEND | O_WRONLY); //open file for appending
@@ -183,18 +197,17 @@ int main()
             return -1;
         }
 
-        recv_rc = recv(new_sock_fd, buf, BUF_LEN, 0);
-                    
+        //read packet of size BUF_LEN
+        recv_rc = recv(new_sock_fd, buf, BUF_LEN, 0);        
         if(recv_rc == -1)
         {
             perror("recv failure");
             syslog(LOG_ERR, "recv failure");
             return -1;
         }
-        printf("%s\n", buf);
         while(recv_rc != 0) //while still receiving packets
         {
-            for(i=0; i<BUF_LEN; i++)
+            for(i=0; i<BUF_LEN; i++) //search latest buf for newline
             {
                 if(buf[i] == '\n')
                 {          
@@ -205,33 +218,33 @@ int main()
             }
             
             received_len = received_len + i;
-            ptr=(char *)realloc(ptr, received_len + 1);
+            ptr=(char *)realloc(ptr, received_len + 1); //reallocate memory to current packet size
 
             if(ptr == NULL)
             {
                 perror("realloc failure");
                 exit(1);
             }
-            memcpy(ptr + received_len - i, buf, i);
+            memcpy(ptr + received_len - i, buf, i); //copy buf to ptr
             memset(buf,0,BUF_LEN);
 
-            if(write_flag)
+            if(write_flag) //if newline received
             {
-                if(write(fd, ptr, received_len) == -1)
+                if(write(fd, ptr, received_len) == -1) //write packet contained in ptr
                 {
                     perror("write failure");
                     exit(1);
                 }
                 close(fd);
 
-                file = fopen("/var/tmp/aesdsocketdata", "rb"); //open file for appending
+                file = fopen("/var/tmp/aesdsocketdata", "rb"); //open file for appending packets
                 if(file == NULL)
                 {
                     perror("fopen failure");
                     exit(1);
                 }
 
-                while(1)
+                while(1) //individually print characters of all previous packets
                 {
                     int next_char;
                     char c;
@@ -254,7 +267,7 @@ int main()
                 received_len = 0;
                 write_flag = false;
             }
-            recv_rc = recv(new_sock_fd, buf, BUF_LEN, 0);
+            recv_rc = recv(new_sock_fd, buf, BUF_LEN, 0); //receive next buf
                     
             if(recv_rc == -1)
             {
@@ -263,7 +276,7 @@ int main()
                 return -1;
             }
         }
-        free(ptr);
+        free(ptr); // free memory at end of packet
     }
     close(sock_fd);
     close(new_sock_fd);
