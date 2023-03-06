@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
     }
 
     //create file
-    fd = open("/var/tmp/aesdsocketdata", O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO);
+    fd = open("/var/tmp/aesdsocketdata", O_WRONLY | O_CREAT | O_TRUNC, 0777);
     if(fd == -1)
     {
         perror("file creation");
