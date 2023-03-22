@@ -1,7 +1,8 @@
 SRC := aesdsocket.c 
 TARGET = aesdsocket
 OBJS := $(SRC:.c=.o)
-CFLAGS = -g -Wall -Werror
+CFLAGS = -g -Wall -Werror -pthread
+
 
 CROSS_COMPILE:=
 CC:= $(CROSS_COMPILE)gcc

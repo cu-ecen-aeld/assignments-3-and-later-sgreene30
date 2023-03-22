@@ -19,12 +19,24 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <time.h>
+#include <pthread.h>
 
 #define PORT "9000"
 #define BACKLOG 5
 #define BUF_LEN 1024
+#define SOCKET_DATA "/var/tmp/aesdsocketdata"
 
 int sock_fd, new_sock_fd; //socket file descriptor for socket()
+int fd = 0;
+
+void clean_exit()
+{
+    close(sock_fd);
+    close(new_sock_fd);
+    unlink(SOCKET_DATA);
+    exit(1);
+}
 
 static void signal_handler(int sig_num)
 {
@@ -37,10 +49,8 @@ static void signal_handler(int sig_num)
         syslog(LOG_INFO, "Caught signal, exiting");
     }
     
-    close(sock_fd);
-    close(new_sock_fd);
-    unlink("/var/tmp/aesdsocketdata");
-    exit(1);
+    clean_exit();
+
 }
 
 void *get_in_addr(struct sockaddr *sa)
@@ -51,14 +61,113 @@ void *get_in_addr(struct sockaddr *sa)
 
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
+void *socket_thread()
+{
+    char *ptr; //for handling dynamic memory
+    int i = 0;
+    int received_len = 0;
+    FILE *file;
+    bool write_flag = false; 
+    char buf[BUF_LEN];
+    int recv_rc;
+
+    ptr = (char*)malloc(1); //start allocation will realloc below
+    if(ptr==NULL)
+    {
+        perror("malloc failure");
+        return NULL;
+    }
+
+    //read packet of size BUF_LEN
+    recv_rc = recv(new_sock_fd, buf, BUF_LEN, 0);        
+    if(recv_rc == -1)
+    {
+        perror("recv failure");
+        syslog(LOG_ERR, "recv failure");
+        return NULL;
+    }
+    while(recv_rc != 0) //while still receiving packets
+    {
+        for(i=0; i<BUF_LEN; i++) //search latest buf for newline
+        {
+            if(buf[i] == '\n')
+            {          
+                i++;
+                write_flag = true;
+                break;
+            }
+        }
+        
+        received_len = received_len + i;
+        ptr=(char *)realloc(ptr, received_len + 1); //reallocate memory to current packet size
+
+        if(ptr == NULL)
+        {
+            perror("realloc failure");
+            return NULL;
+        }
+        memcpy(ptr + received_len - i, buf, i); //copy buf to ptr
+        memset(buf,0,BUF_LEN);
+
+        if(write_flag) //if newline received
+        {
+            fd = open(SOCKET_DATA, O_APPEND | O_WRONLY); //open file for appending
+            if(fd == -1)
+            {
+                perror("open failure");
+                return NULL;
+            }
+            if(write(fd, ptr, received_len) == -1) //write packet contained in ptr
+            {
+                perror("write failure");
+                return NULL;
+            }
+            close(fd);
+
+            file = fopen(SOCKET_DATA, "rb"); //open file for appending packets
+            if(file == NULL)
+            {
+                perror("fopen failure");
+                return NULL;
+            }
+
+            while(1) //individually print characters of all previous packets
+            {
+                int next_char;
+                char c;
+                next_char = fgetc(file);
+                if(next_char == EOF)
+                {
+                    break;
+                }
+                c = next_char;
+                if(send(new_sock_fd, &c, 1, 0) == -1)
+                {
+                    perror("send failure");
+                    syslog(LOG_ERR, "recv failure");
+                    return NULL;
+                }
+            }
+
+            received_len = 0;
+            write_flag = false;
+        }
+        recv_rc = recv(new_sock_fd, buf, BUF_LEN, 0); //receive next buf
+                    
+        if(recv_rc == -1)
+        {
+            perror("recv failure");
+            syslog(LOG_ERR, "recv failure");
+            return NULL;
+        }
+    }
+    free(ptr); // free memory at end of packet
+    return NULL;
+}
 
 int main(int argc, char *argv[])
 {
     int opt = 1;
-    int fd = 0;
-    int recv_rc;
-    int i = 0;
-    int received_len = 0;
 
     struct addrinfo hints; //hints for bind()
     struct addrinfo *servinfo; //for point results of bind()
@@ -66,11 +175,7 @@ int main(int argc, char *argv[])
 
     socklen_t addr_size;
     char client_address[INET6_ADDRSTRLEN];
-    char buf[BUF_LEN];
-    char *ptr; //for handling dynamic memory   
-
-    FILE *file;
-    bool write_flag = false;
+      
     
     openlog(NULL, LOG_PID, LOG_USER); //open syslog
 
@@ -151,7 +256,7 @@ int main(int argc, char *argv[])
     }
 
     //create file
-    fd = open("/var/tmp/aesdsocketdata", O_WRONLY | O_CREAT | O_TRUNC, 0777);
+    fd = open(SOCKET_DATA, O_WRONLY | O_CREAT | O_TRUNC, 0777);
     if(fd == -1)
     {
         perror("file creation");
@@ -182,103 +287,15 @@ int main(int argc, char *argv[])
             syslog(LOG_INFO,"Accepts connection from %s",client_address);
             //printf("Accepts connection from %s\n",client_address);
         }
-                    
-        fd = open("/var/tmp/aesdsocketdata", O_APPEND | O_WRONLY); //open file for appending
-        if(fd == -1)
+
+        pthread_t socket;
+        if(pthread_create(&socket, NULL, socket_thread, NULL) != 0)
         {
-            perror("open failure");
-            exit(1);
+            perror("pthread_create");
         }
+        pthread_join(socket, NULL);
 
-        ptr = (char*)malloc(1); //start allocation will realloc below
-        if(ptr==NULL)
-        {
-            perror("malloc failure");
-            return -1;
-        }
-
-        //read packet of size BUF_LEN
-        recv_rc = recv(new_sock_fd, buf, BUF_LEN, 0);        
-        if(recv_rc == -1)
-        {
-            perror("recv failure");
-            syslog(LOG_ERR, "recv failure");
-            return -1;
-        }
-        while(recv_rc != 0) //while still receiving packets
-        {
-            for(i=0; i<BUF_LEN; i++) //search latest buf for newline
-            {
-                if(buf[i] == '\n')
-                {          
-                    i++;
-                    write_flag = true;
-                    break;
-                }
-            }
-            
-            received_len = received_len + i;
-            ptr=(char *)realloc(ptr, received_len + 1); //reallocate memory to current packet size
-
-            if(ptr == NULL)
-            {
-                perror("realloc failure");
-                exit(1);
-            }
-            memcpy(ptr + received_len - i, buf, i); //copy buf to ptr
-            memset(buf,0,BUF_LEN);
-
-            if(write_flag) //if newline received
-            {
-                if(write(fd, ptr, received_len) == -1) //write packet contained in ptr
-                {
-                    perror("write failure");
-                    exit(1);
-                }
-                close(fd);
-
-                file = fopen("/var/tmp/aesdsocketdata", "rb"); //open file for appending packets
-                if(file == NULL)
-                {
-                    perror("fopen failure");
-                    exit(1);
-                }
-
-                while(1) //individually print characters of all previous packets
-                {
-                    int next_char;
-                    char c;
-                    next_char = fgetc(file);
-                    if(next_char == EOF)
-                    {
-                        break;
-                    }
-                    c = next_char;
-                    if(send(new_sock_fd, &c, 1, 0) == -1)
-                    {
-                        perror("send failure");
-                        syslog(LOG_ERR, "recv failure");
-                        exit(1);
-                        return -1;
-                    }
-                }
-
-
-                received_len = 0;
-                write_flag = false;
-            }
-            recv_rc = recv(new_sock_fd, buf, BUF_LEN, 0); //receive next buf
-                    
-            if(recv_rc == -1)
-            {
-                perror("recv failure");
-                syslog(LOG_ERR, "recv failure");
-                return -1;
-            }
-        }
-        free(ptr); // free memory at end of packet
     }
-    close(sock_fd);
-    close(new_sock_fd);
+    clean_exit();
     return 0;
 }
