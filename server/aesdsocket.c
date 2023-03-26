@@ -1,41 +1,134 @@
 /*
-*   AUTHOR: Samuel Greene
-*   Assignment 5 Part 1 of AESD
+    Samuel Greene
+    AESD Assignment 6
 */
 
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netdb.h>
-#include <syslog.h>
-#include <errno.h>
-#include <signal.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/wait.h>
-#include <signal.h>
-#include <stdbool.h>
-#include <unistd.h>
 #include <fcntl.h>
-#include <time.h>
+#include <unistd.h>
+#include <string.h>
+#include <syslog.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <stdbool.h>
+#include <signal.h>
+#include <sys/queue.h>
 #include <pthread.h>
+#include <time.h>
 
 #define PORT "9000"
 #define BACKLOG 5
-#define BUF_LEN 1024
 #define SOCKET_DATA "/var/tmp/aesdsocketdata"
+#define BUF_LEN 1024
 
-int sock_fd, new_sock_fd; //socket file descriptor for socket()
-int fd = 0;
+bool caught_signal = false;
 
-void clean_exit()
+struct thread_struct 
 {
-    close(sock_fd);
-    close(new_sock_fd);
-    unlink(SOCKET_DATA);
-    exit(1);
+    int accept_fd;
+	int thread_complete;
+};
+
+typedef struct slist_data_s slist_data_t;
+struct slist_data_s 
+{
+    pthread_t thread_id;
+	struct thread_struct th_data;
+	SLIST_ENTRY(slist_data_s) entries;
+};
+
+SLIST_HEAD(slisthead,slist_data_s) head = SLIST_HEAD_INITIALIZER(head);
+pthread_mutex_t lock;
+
+void receive_sock(int socket_fd)
+{
+    int recv_rc;
+    char buf[BUF_LEN];
+    bool end_flag = false;
+    int writer_fd;
+
+    while(!end_flag)
+    {
+        recv_rc = recv(socket_fd, buf, BUF_LEN, 0);
+        if(recv_rc == -1)
+        {
+            perror("recv failure");
+            syslog(LOG_ERR, "recv failure");
+            return;
+        }
+
+        if(pthread_mutex_lock(&lock) != 0){
+        perror("mutex lock fail");}
+
+        writer_fd = open(SOCKET_DATA, O_APPEND | O_WRONLY);
+        if(writer_fd == -1)
+        {
+            perror("open failure");
+            return;
+        }
+
+        if(write(writer_fd, buf, recv_rc)== -1)
+        {
+            perror("write");
+            syslog(LOG_ERR, "write failure");
+            return;
+        }
+
+        close(writer_fd);
+
+        if(pthread_mutex_unlock(&lock) != 0){
+        perror("mutex lock fail");}
+
+
+        if(strchr(buf, '\n') != NULL)
+        {
+            end_flag = true;
+        }
+    }
+
+}
+
+void send_sock(int local_accept_rc)
+{
+    FILE *file;
+    int next_char;
+    char c;
+
+    if(pthread_mutex_lock(&lock) != 0){
+        perror("mutex lock fail");}
+
+    file = fopen(SOCKET_DATA, "rb"); //open file for appending packets
+    if(file == NULL)
+    {
+        perror("fopen failure");
+        return;
+    }
+
+    while(1) //individually print characters of all previous packets
+    {
+        next_char = fgetc(file);
+        if(next_char == EOF)
+        {
+            break;
+        }
+        c = next_char;
+        if(send(local_accept_rc, &c, 1, 0) == -1)
+        {
+            perror("send failure");
+            syslog(LOG_ERR, "recv failure");
+            return;
+        }
+    }
+    fclose(file);
+
+    if(pthread_mutex_unlock(&lock) != 0){
+        perror("mutex lock fail");}
+
+    return;
 }
 
 static void signal_handler(int sig_num)
@@ -48,9 +141,46 @@ static void signal_handler(int sig_num)
     {
         syslog(LOG_INFO, "Caught signal, exiting");
     }
-    
-    clean_exit();
+    caught_signal = true;
+}
 
+void *socket_thread(void *input_args)
+{
+	struct thread_struct *in_args = input_args;
+
+	receive_sock(in_args->accept_fd);//receive data on socket
+	send_sock(in_args->accept_fd); //send all received data
+	in_args->thread_complete = 1; //set complete flag
+	return input_args;
+}
+
+
+int process_entry(int accept_fd)
+{
+	slist_data_t *entry=NULL;
+	slist_data_t *current_entry;
+
+	entry  = malloc(sizeof(slist_data_t));
+
+	entry->th_data.accept_fd = accept_fd;
+	entry->th_data.thread_complete = 0;
+
+	pthread_create(&entry->thread_id,NULL,socket_thread,(void *)&entry->th_data);
+
+	if(SLIST_EMPTY(&head) != 0)
+    {
+		SLIST_INSERT_HEAD(&head, entry, entries);
+	}
+	else
+    {
+		SLIST_FOREACH(current_entry, &head, entries){
+			if(current_entry->entries.sle_next == NULL){
+				SLIST_INSERT_AFTER(current_entry, entry, entries);
+				break;
+			}
+		}
+	}
+	return 0;
 }
 
 void *get_in_addr(struct sockaddr *sa)
@@ -61,124 +191,30 @@ void *get_in_addr(struct sockaddr *sa)
 
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
-void *socket_thread()
-{
-    char *ptr; //for handling dynamic memory
-    int i = 0;
-    int received_len = 0;
-    FILE *file;
-    bool write_flag = false; 
-    char buf[BUF_LEN];
-    int recv_rc;
 
-    ptr = (char*)malloc(1); //start allocation will realloc below
-    if(ptr==NULL)
-    {
-        perror("malloc failure");
-        return NULL;
-    }
-
-    //read packet of size BUF_LEN
-    recv_rc = recv(new_sock_fd, buf, BUF_LEN, 0);        
-    if(recv_rc == -1)
-    {
-        perror("recv failure");
-        syslog(LOG_ERR, "recv failure");
-        return NULL;
-    }
-    while(recv_rc != 0) //while still receiving packets
-    {
-        for(i=0; i<BUF_LEN; i++) //search latest buf for newline
-        {
-            if(buf[i] == '\n')
-            {          
-                i++;
-                write_flag = true;
-                break;
-            }
-        }
-        
-        received_len = received_len + i;
-        ptr=(char *)realloc(ptr, received_len + 1); //reallocate memory to current packet size
-
-        if(ptr == NULL)
-        {
-            perror("realloc failure");
-            return NULL;
-        }
-        memcpy(ptr + received_len - i, buf, i); //copy buf to ptr
-        memset(buf,0,BUF_LEN);
-
-        if(write_flag) //if newline received
-        {
-            fd = open(SOCKET_DATA, O_APPEND | O_WRONLY); //open file for appending
-            if(fd == -1)
-            {
-                perror("open failure");
-                return NULL;
-            }
-            if(write(fd, ptr, received_len) == -1) //write packet contained in ptr
-            {
-                perror("write failure");
-                return NULL;
-            }
-            close(fd);
-
-            file = fopen(SOCKET_DATA, "rb"); //open file for appending packets
-            if(file == NULL)
-            {
-                perror("fopen failure");
-                return NULL;
-            }
-
-            while(1) //individually print characters of all previous packets
-            {
-                int next_char;
-                char c;
-                next_char = fgetc(file);
-                if(next_char == EOF)
-                {
-                    break;
-                }
-                c = next_char;
-                if(send(new_sock_fd, &c, 1, 0) == -1)
-                {
-                    perror("send failure");
-                    syslog(LOG_ERR, "recv failure");
-                    return NULL;
-                }
-            }
-
-            received_len = 0;
-            write_flag = false;
-        }
-        recv_rc = recv(new_sock_fd, buf, BUF_LEN, 0); //receive next buf
-                    
-        if(recv_rc == -1)
-        {
-            perror("recv failure");
-            syslog(LOG_ERR, "recv failure");
-            return NULL;
-        }
-    }
-    free(ptr); // free memory at end of packet
-    return NULL;
-}
-
+//Check the input argument count to ensure both arguments are provided
 int main(int argc, char *argv[])
 {
-    int opt = 1;
 
+    int writer_fd, sock_fd, new_sock_fd;
+    int opt = 1;
     struct addrinfo hints; //hints for bind()
     struct addrinfo *servinfo; //for point results of bind()
     struct sockaddr_storage client_addr;
 
     socklen_t addr_size;
     char client_address[INET6_ADDRSTRLEN];
-      
-    
-    openlog(NULL, LOG_PID, LOG_USER); //open syslog
+	slist_data_t *entry;
 
+	openlog(NULL,0,LOG_USER);
+	syslog(LOG_DEBUG,"Starting Script Over");	
+	writer_fd = creat(SOCKET_DATA, 0777);
+    close(writer_fd);
+
+	//Initialize SLIST Head
+	SLIST_INIT(&head);
+
+	//Setup signal handler
     struct sigaction new_action; //set up signal and handlers
     memset(&new_action, 0, sizeof(struct sigaction));
     new_action.sa_handler=signal_handler;
@@ -233,18 +269,6 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    //run in daemon mode if argument specified
-    if(argc > 1 && strcmp(argv[1], "-d")==0)
-    {
-        if(daemon(0, 0)==-1)
-        {
-            perror("daemon failure");
-            syslog(LOG_ERR, "daemon failure");
-            exit(1);
-        }
-    }
-
-    //free memory to prevent leak
     freeaddrinfo(servinfo);
 
     //listen
@@ -255,20 +279,45 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    //create file
-    fd = open(SOCKET_DATA, O_WRONLY | O_CREAT | O_TRUNC, 0777);
-    if(fd == -1)
+    if(argc > 1 && strcmp(argv[1], "-d")==0)
     {
-        perror("file creation");
-        return -1;
+        if(daemon(0, 0)==-1)
+        {
+            perror("daemon failure");
+            syslog(LOG_ERR, "daemon failure");
+            exit(1);
+        }
     }
-
-    close(fd);
-
-    while(1)
+	
+	while(1)
     {
-        addr_size = sizeof client_addr;
-        //accept connection if found
+        //check to see if signal occured
+		if(caught_signal == true)
+        {
+			SLIST_FOREACH(entry, &head, entries)
+            {
+				if(entry->th_data.thread_complete == 1)
+                {
+					pthread_join(entry->thread_id,NULL);
+				}
+				//close connection
+				close(entry->th_data.accept_fd);
+			}
+			//free SLIST
+            while (!SLIST_EMPTY(&head))
+            {
+                entry = SLIST_FIRST(&head);
+                close(entry->th_data.accept_fd);
+                SLIST_REMOVE_HEAD(&head, entries);
+                free(entry);
+            }
+
+			close(sock_fd);
+			unlink(SOCKET_DATA);
+			closelog();
+			return 0;
+		}
+
         new_sock_fd = accept(sock_fd, (struct sockaddr *)&client_addr, &addr_size);
         if(new_sock_fd == -1)
         {
@@ -285,17 +334,21 @@ int main(int argc, char *argv[])
                                 
             //print address to syslog and terminal
             syslog(LOG_INFO,"Accepts connection from %s",client_address);
-            //printf("Accepts connection from %s\n",client_address);
         }
 
-        pthread_t socket;
-        if(pthread_create(&socket, NULL, socket_thread, NULL) != 0)
+		
+		process_entry(new_sock_fd);
+		//join threads that are completed
+		SLIST_FOREACH(entry, &head, entries)
         {
-            perror("pthread_create");
-        }
-        pthread_join(socket, NULL);
-
-    }
-    clean_exit();
-    return 0;
+			if(entry->th_data.thread_complete == 1)
+            {
+                syslog(LOG_DEBUG,"SLIST: Attempting to join thread pointed to by %i",entry->th_data.accept_fd);
+				pthread_join(entry->thread_id,NULL);
+				close(entry->th_data.accept_fd);	
+			}
+			entry->th_data.thread_complete = 0;
+		}
+	}
+	return 0;
 }
