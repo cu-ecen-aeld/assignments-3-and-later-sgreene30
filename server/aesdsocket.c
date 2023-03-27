@@ -44,6 +44,42 @@ struct slist_data_s
 SLIST_HEAD(slisthead,slist_data_s) head = SLIST_HEAD_INITIALIZER(head);
 pthread_mutex_t lock;
 
+void timer_event()
+{
+    time_t curr_time;
+    struct tm *curr_localtime;
+    char timestamp[128];
+    int fd;
+
+    time(&curr_time);
+    curr_localtime = localtime(&curr_time);
+    strftime(timestamp, sizeof(timestamp), "timestamp:%a, %d %b %Y %T %z\n", curr_localtime);
+    // acquire a lock on the mutex to protect access to the shared file descriptor
+
+    if(pthread_mutex_lock(&lock) != 0){
+    perror("mutex lock fail");}
+
+    fd = open(SOCKET_DATA, O_APPEND | O_WRONLY);
+    if(fd == -1)
+    {
+        perror("open failure");
+        return;
+    }
+    lseek(fd, 0, SEEK_END);
+    if(write(fd, timestamp, strlen(timestamp))== -1)
+    {
+        perror("write");
+        return;
+    }
+
+    close(fd);
+
+    if(pthread_mutex_unlock(&lock) != 0){
+    perror("mutex lock fail");}
+
+    return;
+}
+
 void receive_sock(int socket_fd)
 {
     int recv_rc;
@@ -206,6 +242,10 @@ int main(int argc, char *argv[])
     char client_address[INET6_ADDRSTRLEN];
 	slist_data_t *entry;
 
+    timer_t timerid;
+    struct itimerspec itimer;
+    struct sigevent sgev;
+
 	openlog(NULL,0,LOG_USER);
 	syslog(LOG_DEBUG,"Starting Script Over");	
 	writer_fd = creat(SOCKET_DATA, 0777);
@@ -227,6 +267,29 @@ int main(int argc, char *argv[])
     if(sigaction(SIGTERM, &new_action, NULL) != 0)
     {
         perror("sigaction failure");
+        exit(1);
+    }
+
+    //setup timer
+    memset(&sgev, 0, sizeof(struct sigevent));
+    sgev.sigev_notify = SIGEV_THREAD;
+    sgev.sigev_value.sival_ptr = &timerid;
+    sgev.sigev_notify_function = timer_event;
+
+    itimer.it_value.tv_sec=10;
+    itimer.it_value.tv_nsec = 0;
+    itimer.it_interval.tv_sec=10;
+    itimer.it_interval.tv_nsec = 0;    
+
+    if(timer_create(CLOCK_MONOTONIC, &sgev, &timerid)==-1)
+    {
+        perror("timer_create");
+        exit(1);
+    }
+
+    if(timer_settime(timerid, 0, &itimer, NULL)!=0)
+    {
+        perror("settime");
         exit(1);
     }
 
