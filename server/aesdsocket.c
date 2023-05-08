@@ -21,7 +21,7 @@
 #include <time.h>
 
 #define PORT "9000"
-#define BACKLOG 5
+#define BACKLOG 20
 #define SOCKET_DATA "/var/tmp/aesdsocketdata"
 #define BUF_LEN 1024
 
@@ -44,8 +44,9 @@ struct slist_data_s
 SLIST_HEAD(slisthead,slist_data_s) head = SLIST_HEAD_INITIALIZER(head);
 pthread_mutex_t lock;
 
-void timer_event()
+void timer_event(union sigval sigval)
 {
+    syslog(LOG_DEBUG, "beginning of timer_event()");
     time_t curr_time;
     struct tm *curr_localtime;
     char timestamp[128];
@@ -55,7 +56,6 @@ void timer_event()
     curr_localtime = localtime(&curr_time);
     strftime(timestamp, sizeof(timestamp), "timestamp:%a, %d %b %Y %T %z\n", curr_localtime);
     // acquire a lock on the mutex to protect access to the shared file descriptor
-
     if(pthread_mutex_lock(&lock) != 0){
     perror("mutex lock fail");}
 
@@ -246,8 +246,10 @@ int main(int argc, char *argv[])
     struct itimerspec itimer;
     struct sigevent sgev;
 
+    //int daemon_pid;
+
 	openlog(NULL,0,LOG_USER);
-	syslog(LOG_DEBUG,"Starting Script Over");	
+	syslog(LOG_DEBUG,"starting aesdsocket");	
 	writer_fd = creat(SOCKET_DATA, 0777);
     close(writer_fd);
 
@@ -273,8 +275,8 @@ int main(int argc, char *argv[])
     //setup timer
     memset(&sgev, 0, sizeof(struct sigevent));
     sgev.sigev_notify = SIGEV_THREAD;
-    sgev.sigev_value.sival_ptr = &timerid;
-    sgev.sigev_notify_function = timer_event;
+    sgev.sigev_value.sival_ptr = timerid; //look
+    sgev.sigev_notify_function = &timer_event; //look
 
     itimer.it_value.tv_sec=10;
     itimer.it_value.tv_nsec = 0;
@@ -344,6 +346,21 @@ int main(int argc, char *argv[])
 
     if(argc > 1 && strcmp(argv[1], "-d")==0)
     {
+        syslog(LOG_DEBUG, "entering daemon mode aesdsocket");
+        /*daemon_pid = fork();
+        if(daemon_pid ==-1)
+        {
+            return -1;
+        }
+        else if(daemon_pid != 0)
+        {
+            exit(1);            
+        }
+        setsid();
+        chdir("/");
+        open("/dev/null", O_RDWR);
+        dup(0);
+        dup(0);*/
         if(daemon(0, 0)==-1)
         {
             perror("daemon failure");
@@ -357,6 +374,7 @@ int main(int argc, char *argv[])
         //check to see if signal occured
 		if(caught_signal == true)
         {
+            timer_delete(timerid);
 			SLIST_FOREACH(entry, &head, entries)
             {
 				if(entry->th_data.thread_complete == 1)
