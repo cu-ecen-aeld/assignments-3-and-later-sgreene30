@@ -32,6 +32,14 @@ struct thread_struct
     int accept_fd;
 	int thread_complete;
 };
+struct timer_thread_data
+{    
+    // The number of times the timer_thread has fired   
+    unsigned int timer_count;
+
+    // a mutex to use when accessing the structure
+    pthread_mutex_t lock;
+};
 
 typedef struct slist_data_s slist_data_t;
 struct slist_data_s 
@@ -243,6 +251,7 @@ int main(int argc, char *argv[])
 	slist_data_t *entry;
 
     timer_t timerid;
+    struct timer_thread_data ttd;
     struct itimerspec itimer;
     struct sigevent sgev;
 
@@ -275,8 +284,8 @@ int main(int argc, char *argv[])
     //setup timer
     memset(&sgev, 0, sizeof(struct sigevent));
     sgev.sigev_notify = SIGEV_THREAD;
-    sgev.sigev_value.sival_ptr = timerid; //look
-    sgev.sigev_notify_function = &timer_event; //look
+    sgev.sigev_notify_function = timer_event; //look
+    sgev.sigev_value.sival_ptr = &timerid; //look
 
     itimer.it_value.tv_sec=10;
     itimer.it_value.tv_nsec = 0;
@@ -414,7 +423,7 @@ int main(int argc, char *argv[])
             client_address, sizeof client_address);
                                 
             //print address to syslog and terminal
-            syslog(LOG_INFO,"Accepts connection from %s",client_address);
+            //syslog(LOG_INFO,"Accepts connection from %s",client_address);
         }
 
 		
