@@ -50,55 +50,6 @@ struct slist_data_s
 SLIST_HEAD(slisthead,slist_data_s) head = SLIST_HEAD_INITIALIZER(head);
 pthread_mutex_t lock;
 
-/*void timer_event(union sigval sigval)
-{
-    syslog(LOG_DEBUG, "beginning of timer_event()");
-    struct timer_thread_data *ttd = (struct timer_thread_data*) sigval.sival_ptr;
-    
-    if(pthread_mutex_lock(&ttd->lock) != 0)
-    {
-        perror("mutex lock error");
-    }
-    else
-    {
-        time_t curr_time;
-        struct tm *curr_localtime;
-        char timestamp[128];
-        int fd;
-
-        time(&curr_time);
-        curr_localtime = localtime(&curr_time);
-        strftime(timestamp, sizeof(timestamp), "timestamp:%a, %d %b %Y %T %z\n", curr_localtime);
-        // acquire a lock on the mutex to protect access to the shared file descriptor
-        //   if(pthread_mutex_lock(&lock) != 0){
-        //   perror("mutex lock fail");}
-
-        fd = open(SOCKET_DATA, O_APPEND | O_WRONLY);
-        if(fd == -1)
-        {
-            perror("open failure");
-            return;
-        }
-        lseek(fd, 0, SEEK_END);
-        if(write(fd, timestamp, strlen(timestamp))== -1)
-        {
-            perror("write");
-            return;
-        }
-
-        close(fd);
-
-        //   if(pthread_mutex_unlock(&lock) != 0){
-        //   perror("mutex lock fail");}
-        if(pthread_mutex_unlock(&ttd->lock) != 0){
-            perror("mutex unlock fail");}
-    }
-
-    syslog(LOG_DEBUG, "end of timer_event()");
-
-    return;
-}*/
-
 /* timer_thread runs every 10 seconds 
 * Assumes timer_create has configured for sigval.sival_ptr to point to the
 * thread data used for the timer
@@ -343,13 +294,6 @@ int main(int argc, char *argv[])
     struct timer_thread_data ttd;
     struct sigevent sev;
     timer_t timerid;
-    
-    /*timer_t timerid;
-    struct timer_thread_data ttd;
-    struct itimerspec itimer;
-    struct sigevent sgev;*/
-
-    //int daemon_pid;
 
 	openlog(NULL,0,LOG_USER);
 	syslog(LOG_DEBUG,"starting aesdsocket");	
@@ -374,31 +318,6 @@ int main(int argc, char *argv[])
         perror("sigaction failure");
         exit(1);
     }
-
-    /*//setup timer
-    memset(&ttd,0,sizeof(struct timer_thread_data));
-
-    memset(&sgev, 0, sizeof(struct sigevent));
-    sgev.sigev_notify = SIGEV_THREAD;
-    sgev.sigev_notify_function = timer_event; //look
-    sgev.sigev_value.sival_ptr = &ttd; //look
-
-    itimer.it_value.tv_sec=10;
-    itimer.it_value.tv_nsec = 0;
-    itimer.it_interval.tv_sec=10;
-    itimer.it_interval.tv_nsec = 0;    
-
-    if(timer_create(CLOCK_MONOTONIC, &sgev, &timerid)==-1)
-    {
-        perror("timer_create");
-        exit(1);
-    }
-
-    if(timer_settime(timerid, 0, &itimer, NULL)!=0)
-    {
-        perror("settime");
-        exit(1);
-    }*/
 
     //clear and set hints struct
     memset(&hints, 0, sizeof hints);
@@ -526,12 +445,8 @@ int main(int argc, char *argv[])
                         inet_ntop(client_addr.ss_family,
                         get_in_addr((struct sockaddr *)&client_addr),
                         client_address, sizeof client_address);
-                                            
-                        //print address to syslog and terminal
-                        //syslog(LOG_INFO,"Accepts connection from %s",client_address);
                     }
 
-		
                     process_entry(new_sock_fd);
                     //join threads that are completed
                     SLIST_FOREACH(entry, &head, entries)
@@ -558,69 +473,7 @@ int main(int argc, char *argv[])
             }
         }
     }
-	
-	/*while(1)
-    {
-        //check to see if signal occured
-		if(caught_signal == true)
-        {
-            timer_delete(timerid);
-			SLIST_FOREACH(entry, &head, entries)
-            {
-				if(entry->th_data.thread_complete == 1)
-                {
-					pthread_join(entry->thread_id,NULL);
-				}
-				//close connection
-				close(entry->th_data.accept_fd);
-			}
-			//free SLIST
-            while (!SLIST_EMPTY(&head))
-            {
-                entry = SLIST_FIRST(&head);
-                close(entry->th_data.accept_fd);
-                SLIST_REMOVE_HEAD(&head, entries);
-                free(entry);
-            }
-
-			close(sock_fd);
-			unlink(SOCKET_DATA);
-			closelog();
-			return 0;
-		}
-
-        new_sock_fd = accept(sock_fd, (struct sockaddr *)&client_addr, &addr_size);
-        if(new_sock_fd == -1)
-        {
-            perror("accept failure");
-            syslog(LOG_ERR, "accept failure");
-            return -1;
-        }
-        else //print client ip to syslog per step 2 part d
-        {
-            //get client address and store in string client_address
-            inet_ntop(client_addr.ss_family,
-            get_in_addr((struct sockaddr *)&client_addr),
-            client_address, sizeof client_address);
-                                
-            //print address to syslog and terminal
-            //syslog(LOG_INFO,"Accepts connection from %s",client_address);
-        }
-
-		
-		process_entry(new_sock_fd);
-		//join threads that are completed
-		SLIST_FOREACH(entry, &head, entries)
-        {
-			if(entry->th_data.thread_complete == 1)
-            {
-                syslog(LOG_DEBUG,"SLIST: Attempting to join thread pointed to by %i",entry->th_data.accept_fd);
-				pthread_join(entry->thread_id,NULL);
-				close(entry->th_data.accept_fd);	
-			}
-			entry->th_data.thread_complete = 0;
-		}
-	}*/
+    
     syslog(LOG_DEBUG, "ending aesdsocket");
 	return 0;
 }
