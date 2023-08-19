@@ -1,17 +1,30 @@
-SRC ?= aesdsocket.c 
-TARGET ?= aesdsocket
-OBJS ?= $(SRC:.c=.o)
-LDFLAGS ?= -pthread -lrt
-CFLAGS ?= -g -Wall -Werror
+# See example Makefile from scull project
+# Comment/uncomment the following line to disable/enable debugging
+#DEBUG = y
 
-CROSS_COMPILE?= aarch64-none-linux-gnu
-CC?= $(CROSS_COMPILE)gcc
+# Add your debugging flag (or not) to CFLAGS
+ifeq ($(DEBUG),y)
+  DEBFLAGS = -O -g -DSCULL_DEBUG # "-O" is needed to expand inlines
+else
+  DEBFLAGS = -O2
+endif
 
+EXTRA_CFLAGS += $(DEBFLAGS)
 
-all: $(TARGET)
+ifneq ($(KERNELRELEASE),)
+# call from kernel build system
+obj-m	:= aesdchar.o
+aesdchar-y := aesd-circular-buffer.o main.o
+else
 
-$(TARGET) : $(OBJS)
-	$(CC) $(INCLUDES) $(OBJS) -o $(TARGET) $(LDFLAGS) $(CFLAGS)
+KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+PWD       := $(shell pwd)
+
+modules:
+	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
+
+endif
 
 clean:
-	-rm -f *.o $(TARGET) *.elf *.map
+	rm -rf *.o *~ core .depend .*.cmd *.ko *.mod.c .tmp_versions
+
