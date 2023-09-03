@@ -21,7 +21,7 @@
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
 
-MODULE_AUTHOR("Your Name Here"); /** TODO: fill in your name **/
+MODULE_AUTHOR("Samuel Greene"); /** TODO: fill in your name **/
 MODULE_LICENSE("Dual BSD/GPL");
 
 struct aesd_dev aesd_device;
@@ -30,8 +30,13 @@ int aesd_open(struct inode *inode, struct file *filp)
 {
     PDEBUG("open");
     /**
-     * TODO: handle open
+     * TODO: COMPLETED handle open
      */
+     struct aesd_dev *new_aesd_dev;
+     new_aesd_dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
+     filp->private_data = new_aesd_dev;
+
+
     return 0;
 }
 
@@ -52,6 +57,18 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     /**
      * TODO: handle read
      */
+    /*struct aesd_dev *dev = filp->private_data;
+
+    
+
+	if (mutex_lock_interruptible(&dev->lock))
+		return -ERESTARTSYS;
+
+
+    goto out;
+
+ out:
+	mutex_unlock(&dev->lock);*/
     return retval;
 }
 
