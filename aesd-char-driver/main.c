@@ -28,13 +28,13 @@ struct aesd_dev aesd_device;
 
 int aesd_open(struct inode *inode, struct file *filp)
 {
+    struct aesd_dev *dev;
     PDEBUG("open");
     /**
      * TODO: COMPLETED handle open
      */
-     struct aesd_dev *new_aesd_dev;
-     new_aesd_dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
-     filp->private_data = new_aesd_dev;
+    dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
+    filp->private_data = dev;
 
 
     return 0;
@@ -53,6 +53,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
                 loff_t *f_pos)
 {
     ssize_t retval = 0;
+    //char *read_buf;
     PDEBUG("read %zu bytes with offset %lld",count,*f_pos);
     /**
      * TODO: handle read
@@ -60,27 +61,65 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     /*struct aesd_dev *dev = filp->private_data;
 
     
-
+    PDEBUG("locking mutex");
 	if (mutex_lock_interruptible(&dev->lock))
 		return -ERESTARTSYS;
 
+    PDEBUG("beginning kmalloc");    
+    //read_buf = kmalloc(count*sizeof(char *), GFP_KERNEL);
+    if(!read_buf)
+    {
+        PDEBUG("kmalloc return error"); 
+        goto exit;
+    }
+    memset(read_buf, 0, count * sizeof(char *));
 
-    goto out;
+    PDEBUG("reading from circular buffer"); 
+    
 
- out:
-	mutex_unlock(&dev->lock);*/
-    return retval;
+
+    goto exit;
+
+    exit:
+	    mutex_unlock(&dev->lock);*/
+        return retval;
 }
 
 ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
                 loff_t *f_pos)
 {
     ssize_t retval = -ENOMEM;
+    char *write_buf;
+    struct aesd_dev *dev = filp->private_data;
     PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
     /**
      * TODO: handle write
      */
-    return retval;
+    PDEBUG("locking mutex");
+	if (mutex_lock_interruptible(&dev->lock))
+		return -ERESTARTSYS;
+
+    PDEBUG("beginning kmalloc");    
+    //write_buf = kmalloc(count*sizeof(char *), GFP_KERNEL);
+    if(!write_buf)
+    {
+        PDEBUG("kmalloc return error"); 
+        goto exit;
+    }
+    memset(write_buf, 0, count * sizeof(char *));
+
+    PDEBUG("beginning copy_from_user");
+    if(copy_from_user(write_buf, buf, count))
+    {
+        retval = -EFAULT;
+    }
+    PDEBUG("User buffer was %s", buf);
+    PDEBUG("Copied buffer was %s", write_buf);
+    
+
+    exit:
+	    mutex_unlock(&dev->lock);
+        return retval;
 }
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
