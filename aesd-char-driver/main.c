@@ -18,6 +18,7 @@
 #include <linux/cdev.h>
 #include <linux/fs.h> // file_operations
 #include "aesdchar.h"
+#include <linux/slab.h>
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
 
@@ -100,7 +101,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 		return -ERESTARTSYS;
 
     PDEBUG("beginning kmalloc");    
-    //write_buf = kmalloc(count*sizeof(char *), GFP_KERNEL);
+    write_buf = kmalloc(count*sizeof(char *), GFP_KERNEL);
     if(!write_buf)
     {
         PDEBUG("kmalloc return error"); 
