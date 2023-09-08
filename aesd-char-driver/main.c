@@ -96,10 +96,13 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     /**
      * TODO: handle write
      */
+
+     //interruptable mutex
     PDEBUG("locking mutex");
 	if (mutex_lock_interruptible(&dev->lock))
 		return -ERESTARTSYS;
 
+    //malloc and clear write buffer
     PDEBUG("beginning kmalloc");    
     write_buf = kmalloc(count*sizeof(char *), GFP_KERNEL);
     if(!write_buf)
@@ -109,16 +112,23 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     }
     memset(write_buf, 0, count * sizeof(char *));
 
+    //get buffer from user space
     PDEBUG("beginning copy_from_user");
     if(copy_from_user(write_buf, buf, count))
     {
         retval = -EFAULT;
     }
     PDEBUG("User buffer was %s", buf);
-    PDEBUG("Copied buffer was%s", write_buf);
+    PDEBUG("Copied buffer was %s", write_buf);
     
+    //add entry to circular buffer
+    PDEBUG("adding packet to circular buffer");
+    dev->entry->buffptr = write_buf;
+    dev->entry->size = strlen(write_buf);
 
+    aesd_circular_buffer_add_entry(dev->circular_buffer, dev->entry);
     exit:
+        kfree(write_buf);
 	    mutex_unlock(&dev->lock);
         return retval;
 }
