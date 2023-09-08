@@ -1,4 +1,6 @@
 #!/bin/sh
+#script to make and move files to rootfs_overlay in build repository
+
 make clean
 make
 

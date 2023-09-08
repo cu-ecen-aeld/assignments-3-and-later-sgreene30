@@ -115,7 +115,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         retval = -EFAULT;
     }
     PDEBUG("User buffer was %s", buf);
-    PDEBUG("Copied buffer was %s", write_buf);
+    PDEBUG("Copied buffer was%s", write_buf);
     
 
     exit:
