@@ -91,6 +91,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 {
     ssize_t retval = -ENOMEM;
     char *write_buf;
+    ssize_t write_len;
     struct aesd_dev *dev = filp->private_data;
     PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
     /**
@@ -118,10 +119,19 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     {
         retval = -EFAULT;
     }
+
+    write_len = strlen(write_buf) + 1;
+    PDEBUG("kmalloc buffptr");
+    dev->entry->buffptr = (char *)kmalloc(write_len * sizeof(char),GFP_KERNEL);
+    if(dev->entry->buffptr == NULL)
+    {
+        goto exit;
+    }
+
     PDEBUG("User buffer was %s", buf);
     PDEBUG("Copied buffer was %s", write_buf);
     PDEBUG("*write_buf: %d",  *write_buf);
-    PDEBUG("&write_buf: %s", &write_buf);
+    //PDEBUG("&write_buf: %d", (int)&write_buf);
 
     //add entry to circular buffer
     PDEBUG("adding buffer to entry");
