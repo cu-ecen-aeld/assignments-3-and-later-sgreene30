@@ -104,7 +104,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
     //malloc and clear write buffer
     PDEBUG("beginning kmalloc");    
-    write_buf = kmalloc(count*sizeof(char *), GFP_KERNEL);
+    write_buf = (char *)kmalloc(count*sizeof(char *), GFP_KERNEL);
     if(!write_buf)
     {
         PDEBUG("kmalloc return error"); 
@@ -123,7 +123,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     
     //add entry to circular buffer
     PDEBUG("adding buffer to entry");
-    dev->entry->buffptr = *write_buf;
+    dev->entry->buffptr = write_buf;
     PDEBUG("entering size");
     dev->entry->size = strlen(write_buf);
 
