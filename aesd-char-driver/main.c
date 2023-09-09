@@ -120,10 +120,12 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     }
     PDEBUG("User buffer was %s", buf);
     PDEBUG("Copied buffer was %s", write_buf);
-    
+    PDEBUG("*write_buf: %d",  *write_buf)
+    PDEBUG("&write_buf: %d", &writebuf)
+
     //add entry to circular buffer
     PDEBUG("adding buffer to entry");
-    dev->entry->buffptr = write_buf;
+    dev->entry->buffptr = *write_buf;
     PDEBUG("entering size");
     dev->entry->size = strlen(write_buf);
 
