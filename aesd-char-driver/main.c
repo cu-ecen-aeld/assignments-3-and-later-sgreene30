@@ -103,8 +103,9 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
     //malloc
     PDEBUG("beginning kmalloc");    
-    dev->entry->buffptr = kmalloc(count*sizeof(char *), GFP_KERNEL);
-    if(!dev->entry->buffptr)
+    //dev->entry->buffptr = kmalloc(count*sizeof(char *), GFP_KERNEL);
+     dev->entry.buffptr = krealloc(dev->entry.buffptr, dev->entry.size + count, GFP_KERNEL);
+    if(!dev->entry.buffptr)
     {
         PDEBUG("kmalloc return error"); 
         goto exit;
@@ -112,14 +113,14 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
     //get buffer from user space
     PDEBUG("beginning copy_from_user");
-    if(copy_from_user((char *)dev->entry->buffptr, buf, count))
+    if(copy_from_user((char *)dev->entry.buffptr, buf, count))
     {
         retval = -EFAULT;
     }
 
 
     PDEBUG("User buffer was %s", buf);
-    PDEBUG("Copied buffer was %s", dev->entry->buffptr);
+    PDEBUG("Copied buffer was %s", dev->entry.buffptr);
     //PDEBUG("*write_buf: %d",  *write_buf);
     //PDEBUG("&write_buf: %d", (int)&write_buf);*/
 
