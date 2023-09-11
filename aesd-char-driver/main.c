@@ -90,8 +90,6 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
                 loff_t *f_pos)
 {
     ssize_t retval = -ENOMEM;
-    char *write_buf;
-    ssize_t write_len;
     struct aesd_dev *dev = filp->private_data;
     PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
     /**
@@ -103,46 +101,38 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 	if (mutex_lock_interruptible(&dev->lock))
 		return -ERESTARTSYS;
 
-    //malloc and clear write buffer
+    //malloc
     PDEBUG("beginning kmalloc");    
-    write_buf = (char *)kmalloc(count*sizeof(char *), GFP_KERNEL);
-    if(!write_buf)
+    dev->entry->buffptr = kmalloc(count*sizeof(char *), GFP_KERNEL);
+    if(!dev->entry->buffptr)
     {
         PDEBUG("kmalloc return error"); 
         goto exit;
     }
-    memset(write_buf, 0, count * sizeof(char *));
 
     //get buffer from user space
     PDEBUG("beginning copy_from_user");
-    if(copy_from_user(write_buf, buf, count))
+    if(copy_from_user((char *)dev->entry->buffptr, buf, count))
     {
         retval = -EFAULT;
     }
 
-    write_len = strlen(write_buf) + 1;
-    PDEBUG("kmalloc buffptr");
-    //dev->entry->buffptr = (char *)kmalloc(write_len * sizeof(char),GFP_KERNEL);
-    /*if(dev->entry->buffptr == NULL)
-    {
-        goto exit;
-    }*/
 
     PDEBUG("User buffer was %s", buf);
-    PDEBUG("Copied buffer was %s", write_buf);
-    PDEBUG("*write_buf: %d",  *write_buf);
-    //PDEBUG("&write_buf: %d", (int)&write_buf);
+    PDEBUG("Copied buffer was %s", dev->entry->buffptr);
+    //PDEBUG("*write_buf: %d",  *write_buf);
+    //PDEBUG("&write_buf: %d", (int)&write_buf);*/
 
     //add entry to circular buffer
     PDEBUG("adding buffer to entry");
-    dev->entry->buffptr = write_buf;
+    //dev->entry->buffptr = *write_buf;
     PDEBUG("entering size");
-    dev->entry->size = strlen(write_buf);
+    //dev->entry->size = strlen(write_buf);
 
     PDEBUG("adding packet to circular buffer");
-    aesd_circular_buffer_add_entry(dev->circular_buffer, dev->entry);
+    //aesd_circular_buffer_add_entry(dev->circular_buffer, dev->entry);
     exit:
-        kfree(write_buf);
+        //kfree(write_buf);
 	    mutex_unlock(&dev->lock);
         return retval;
 }
