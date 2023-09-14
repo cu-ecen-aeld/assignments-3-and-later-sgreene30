@@ -102,9 +102,8 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 		return -ERESTARTSYS;
 
     //malloc
-    PDEBUG("beginning kmalloc");    
-    //dev->entry->buffptr = kmalloc(count*sizeof(char *), GFP_KERNEL);
-     dev->entry.buffptr = krealloc(dev->entry.buffptr, dev->entry.size + count, GFP_KERNEL);
+    PDEBUG("beginning kmalloc");  
+    dev->entry.buffptr = krealloc(dev->entry.buffptr, dev->entry.size + count, GFP_KERNEL);
     if(!dev->entry.buffptr)
     {
         PDEBUG("kmalloc return error"); 
@@ -122,13 +121,15 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     PDEBUG("User buffer was %s", buf);
     PDEBUG("Copied buffer was %s", dev->entry.buffptr);
     //PDEBUG("*write_buf: %d",  *write_buf);
-    //PDEBUG("&write_buf: %d", (int)&write_buf);*/
+    //PDEBUG("&write_buf: %d", (int)&write_buf);
 
-    //add entry to circular buffer
-    PDEBUG("adding buffer to entry");
-    //dev->entry->buffptr = *write_buf;
-    PDEBUG("entering size");
-    //dev->entry->size = strlen(write_buf);
+    dev->entry.size += count;
+    retval = count;
+    /*if(strchr(dev->entry.buffptr, "\n"))
+    {
+        aesd_circular_buffer_add_entry();
+    }*/
+
 
     PDEBUG("adding packet to circular buffer");
     //aesd_circular_buffer_add_entry(dev->circular_buffer, dev->entry);
@@ -177,6 +178,11 @@ int aesd_init_module(void)
     /**
      * TODO: initialize the AESD specific portion of the device
      */
+    aesd_circular_buffer_init(&aesd_device.circular_buffer);
+    aesd_device.entry.size = 0;
+    aesd_device.entry.buffptr = NULL;
+    mutex_init(&aesd_device.lock);
+    //end todo
 
     result = aesd_setup_cdev(&aesd_device);
 
@@ -194,8 +200,12 @@ void aesd_cleanup_module(void)
     cdev_del(&aesd_device.cdev);
 
     /**
-     * TODO: cleanup AESD specific poritions here as necessary
+     * TODO completed: cleanup AESD specific poritions here as necessary
      */
+    kfree(&aesd_device.circular_buffer);
+    kfree(&aesd_device.entry);
+    mutex_destroy(&aesd_device.lock);
+    //end of todo
 
     unregister_chrdev_region(devno, 1);
 }
