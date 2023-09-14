@@ -125,9 +125,23 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
     dev->entry.size += count;
     retval = count;
-    /*if(strchr(dev->entry.buffptr, "\n"))
+
+    /*char newline = '\n';
+    if(strchr(dev->entry.buffptr, newline))
     {
-        aesd_circular_buffer_add_entry();
+        PDEBUG("found newline");
+
+        PDEBUG("free oldest entry if buffer is full");
+        if(dev->circular_buffer.full)
+        {
+            kfree(&dev->circular_buffer.entry[dev->circular_buffer.out_offs]);
+        }
+
+        PDEBUG("adding entry to circular_buffer");
+        aesd_circular_buffer_add_entry(dev->circular_buffer, dev->entry);
+        PDEBUG("resetting entry");
+        dev->entry.size = 0;
+        dev->entry.buffptr = NULL;
     }*/
 
 
@@ -196,14 +210,22 @@ int aesd_init_module(void)
 void aesd_cleanup_module(void)
 {
     dev_t devno = MKDEV(aesd_major, aesd_minor);
-
+    struct aesd_buffer_entry *entry;
+    uint8_t index = 0;
     cdev_del(&aesd_device.cdev);
-
+    PDEBUG("Cleanup Module");
     /**
      * TODO completed: cleanup AESD specific poritions here as necessary
      */
-    kfree(&aesd_device.circular_buffer);
+    PDEBUG("free circular buffer entries");
+    AESD_CIRCULAR_BUFFER_FOREACH(entry,&aesd_device.circular_buffer,index)
+    {
+        kfree(entry->buffptr);
+    }
+
+    PDEBUG("free working entry");
     kfree(&aesd_device.entry);
+    PDEBUG("destroy mutex");
     mutex_destroy(&aesd_device.lock);
     //end of todo
 
