@@ -224,7 +224,7 @@ void aesd_cleanup_module(void)
     }
 
     PDEBUG("free working entry");
-    kfree(&aesd_device.entry);
+    kfree(aesd_device.entry.buffptr);
     PDEBUG("destroy mutex");
     mutex_destroy(&aesd_device.lock);
     //end of todo
