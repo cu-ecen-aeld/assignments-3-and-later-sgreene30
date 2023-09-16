@@ -55,6 +55,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,loff_t *f_po
     ssize_t retval = 0;
     struct aesd_dev *dev = filp->private_data;
     struct aesd_buffer_entry *read_entry;
+    size_t find_entry_rtn = 0;
     PDEBUG("read %zu bytes with offset %lld",count,*f_pos);
     /**
      * TODO: handle read
@@ -68,10 +69,20 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,loff_t *f_po
     }
 
     PDEBUG("reading from circular buffer");
-    read_entry = aesd_circular_buffer_find_entry_offset_for_fpos(&dev->circular_buffer, *f_pos, &retval);
+    read_entry = aesd_circular_buffer_find_entry_offset_for_fpos(&dev->circular_buffer, *f_pos, &find_entry_rtn);
+    if(read_entry == NULL)
+    {
+        retval = 0;
+        goto exit;
+    }
+    retval = read_entry->size - find_entry_rtn;
 
     PDEBUG("copy_to_user");
-    if(copy_to_user(buf, (char *)read_entry->buffptr, count))
+    if(copy_to_user(buf, (char *)read_entry->buffptr, retval) == 0)
+    {
+        *f_pos += retval;
+    }
+    else
     {
         retval = -EFAULT;
         goto exit;
