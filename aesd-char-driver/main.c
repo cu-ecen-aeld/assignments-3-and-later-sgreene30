@@ -101,6 +101,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     ssize_t retval = -ENOMEM;
     struct aesd_dev *dev = filp->private_data;
     char newline = '\n';
+    const char *add_rtn = NULL;
     PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
     /**
      * TODO: handle write
@@ -142,14 +143,19 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     {
         PDEBUG("found newline");
 
-        PDEBUG("free oldest entry if buffer is full");
+        /*PDEBUG("free oldest entry if buffer is full");
         if(dev->circular_buffer.full)
         {
             kfree(&dev->circular_buffer.entry[dev->circular_buffer.out_offs]);
-        }
+        }*/
 
         PDEBUG("adding entry to circular_buffer");
-        aesd_circular_buffer_add_entry(&dev->circular_buffer, &dev->write_entry);
+        add_rtn = aesd_circular_buffer_add_entry(&dev->circular_buffer, &dev->write_entry);
+        if(add_rtn)
+        {
+            kfree(add_rtn);
+        }
+
         PDEBUG("resetting entry");
         dev->write_entry.size = 0;
         dev->write_entry.buffptr = NULL;
