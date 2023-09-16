@@ -78,12 +78,6 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     /**
     * TODO: implement per description
     */
-    //const char *return_buffer = NULL; //return NULL if buffer isn't full
-
-    /*if(buffer->full)
-    {
-        return_buffer = buffer->entry[buffer->in_offs].buffptr; //return position of overwritten entry if buffer is full
-    }*/
 
     //add entry into buffer
     buffer->entry[buffer->in_offs] = *add_entry;
@@ -93,14 +87,13 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     {
         buffer->full = true;
         buffer->in_offs = 0;
-        buffer->out_offs = 0;
-    }
-
-    if(buffer->full && (buffer->in_offs > buffer->out_offs))
-    {
         buffer->out_offs++;
     }
-    //return return_buffer;
+if(buffer->out_offs >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED)
+{
+    buffer->out_offs = 0;
+}
+
 }
 
 /**
