@@ -129,7 +129,8 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
     //get buffer from user space
     //PDEBUG("beginning copy_from_user");
-    if(copy_from_user((void *)(dev->write_entry.buffptr + dev->write_entry.size), buf, count))
+    //if(copy_from_user((void *)(dev->write_entry.buffptr + dev->write_entry.size), buf, count))
+    if(copy_from_user((void *)(dev->write_entry.buffptr), buf, count))
     {
         retval = -EFAULT;
         goto exit;
