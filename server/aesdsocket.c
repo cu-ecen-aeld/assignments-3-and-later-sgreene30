@@ -23,7 +23,7 @@
 
 #define PORT "9000"
 #define BACKLOG 20
-#define SOCKET_DATA "/var/tmp/aesdsocketdata"
+#define SOCKET_DATA "/dev/aesdchar"
 #define BUF_LEN 1024
 
 bool caught_signal = false;
@@ -33,11 +33,11 @@ struct thread_struct
     int accept_fd;
 	int thread_complete;
 };
-struct timer_thread_data
+/*struct timer_thread_data
 {    
     // a mutex to use when accessing the structure
     pthread_mutex_t lock;
-};
+};*/
 
 typedef struct slist_data_s slist_data_t;
 struct slist_data_s 
@@ -56,7 +56,7 @@ pthread_mutex_t lock;
 *
 * Thread appends timestamp to SOCKDATA file
 */
-static void timer_thread ( union sigval sigval )
+/*static void timer_thread ( union sigval sigval )
 {
     struct timer_thread_data *td = (struct timer_thread_data*) sigval.sival_ptr;
     
@@ -93,7 +93,7 @@ static void timer_thread ( union sigval sigval )
             printf("Error %d (%s) unlocking thread data!\n",errno,strerror(errno));
         }
     }
-}
+}*/
 
 /**
 * Setup the timer at @param timerid (previously created with timer_create)  
@@ -101,7 +101,7 @@ static void timer_thread ( union sigval sigval )
 * The time now is saved in @param start_time
 * @return true if the timer could be setup successfuly, false otherwise
 */
-static bool setup_timer( int clock_id,
+/*static bool setup_timer( int clock_id,
                          timer_t timerid,
                          struct timespec *start_time)
 {
@@ -127,7 +127,7 @@ static bool setup_timer( int clock_id,
         }
     }
     return success;
-}
+}*/
 
 void receive_sock(int socket_fd)
 {
@@ -291,9 +291,9 @@ int main(int argc, char *argv[])
     char client_address[INET6_ADDRSTRLEN];
 	slist_data_t *entry;
 
-    struct timer_thread_data ttd;
+    /*struct timer_thread_data ttd;
     struct sigevent sev;
-    timer_t timerid;
+    timer_t timerid;*/
 
 	openlog(NULL,0,LOG_USER);
 	syslog(LOG_DEBUG,"starting aesdsocket");	
@@ -378,19 +378,19 @@ int main(int argc, char *argv[])
         }
     }
 
-        memset(&ttd,0,sizeof(struct timer_thread_data));
+        /*memset(&ttd,0,sizeof(struct timer_thread_data));
     if ( pthread_mutex_init(&ttd.lock,NULL) != 0 ) {
         printf("Error %d (%s) initializing thread mutex!\n",errno,strerror(errno));
-    } 
-    else 
-    {
-        int clock_id = CLOCK_MONOTONIC;
-        memset(&sev,0,sizeof(struct sigevent));
+    } */
+    //else 
+    //{
+        //int clock_id = CLOCK_MONOTONIC;
+        //memset(&sev,0,sizeof(struct sigevent));
         /**
         * Setup a call to timer_thread passing in the ttd structure as the sigev_value
         * argument
         */
-        sev.sigev_notify = SIGEV_THREAD;
+        /*sev.sigev_notify = SIGEV_THREAD;
         sev.sigev_value.sival_ptr = &ttd;
         sev.sigev_notify_function = timer_thread;
         if ( timer_create(clock_id,&sev,&timerid) != 0 ) {
@@ -401,13 +401,13 @@ int main(int argc, char *argv[])
             struct timespec start_time;
 
             if ( setup_timer(clock_id, timerid, &start_time) ) 
-            {
+            {*/
                 while(1)
                 {
                     //check to see if signal occured
                     if(caught_signal == true)
                     {
-                        timer_delete(timerid);
+                        //timer_delete(timerid);
                         SLIST_FOREACH(entry, &head, entries)
                         {
                             if(entry->th_data.thread_complete == 1)
@@ -460,19 +460,19 @@ int main(int argc, char *argv[])
                         entry->th_data.thread_complete = 0;
                     }
                 }
-            }
-            else
+            //}
+            /*else
             {
                 syslog(LOG_ERR, "Failed to setup timer");
                 exit(1);
-            }
+            }*/
 
-            if (timer_delete(timerid) != 0) 
+            /*if (timer_delete(timerid) != 0) 
             {
                 printf("Error %d (%s) deleting timer!\n",errno,strerror(errno));
-            }
-        }
-    }
+            }*/
+        //}
+    //}
     
     syslog(LOG_DEBUG, "ending aesdsocket");
 	return 0;
