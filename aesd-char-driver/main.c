@@ -100,7 +100,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 {
     ssize_t retval = -ENOMEM;
     struct aesd_dev *dev = filp->private_data;
-    char newline = '\n';
+    //char newline = '\n';
     const char *add_rtn = NULL;
     bool found_newline = false;
     int i = 0;
@@ -129,12 +129,12 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
     //get buffer from user space
     //PDEBUG("beginning copy_from_user");
-    if(copy_from_user((char *)dev->write_entry.buffptr, buf, count))
+    if(copy_from_user((char *)(dev->write_entry.buffptr + dev->write_entry.size), buf, count))
     {
         retval = -EFAULT;
         goto exit;
     }
-
+    dev->write_entry.size += count;
     PDEBUG("User buffer was %s", buf);
     //PDEBUG("Copied buffer was %s", dev->write_entry.buffptr);
 
@@ -150,7 +150,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         }
     }
 
-    PDEBUG("strchr return: %s", strchr(dev->write_entry.buffptr, newline));
+    //PDEBUG("strchr return: %s", strchr(dev->write_entry.buffptr, newline));
     if(found_newline)
     {
         PDEBUG("found newline");
