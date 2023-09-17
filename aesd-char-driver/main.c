@@ -78,7 +78,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,loff_t *f_po
     retval = read_entry->size - find_entry_rtn;
 
     PDEBUG("copy_to_user");
-    if(copy_to_user(buf, (char *)read_entry->buffptr + find_entry_rtn, retval) == 0)
+    if(copy_to_user(buf, (char *)read_entry->buffptr, retval) == 0)
     {
         *f_pos += retval;
     }
@@ -136,7 +136,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     }
     dev->write_entry.size += count;
     PDEBUG("User buffer was %s", buf);
-    //PDEBUG("Copied buffer was %s", dev->write_entry.buffptr);
+    PDEBUG("Copied buffer was %s", dev->write_entry.buffptr);
 
     dev->write_entry.size += count;
     retval = count;
