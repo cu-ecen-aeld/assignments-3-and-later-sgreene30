@@ -130,7 +130,6 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     //get buffer from user space
     //PDEBUG("beginning copy_from_user");
     if(copy_from_user((void *)(dev->write_entry.buffptr + dev->write_entry.size), buf, count))
-    //if(copy_from_user((char *)(dev->write_entry.buffptr), buf, count))
     {
         retval = -EFAULT;
         goto exit;
@@ -150,17 +149,9 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         }
     }
 
-    //PDEBUG("strchr return: %s", strchr(dev->write_entry.buffptr, newline));
     if(found_newline)
     {
         PDEBUG("found newline");
-
-        /*PDEBUG("free oldest entry if buffer is full");
-        if(dev->circular_buffer.full)
-        {
-            kfree(&dev->circular_buffer.entry[dev->circular_buffer.out_offs]);
-        }*/
-
         PDEBUG("adding entry to circular_buffer");
         add_rtn = aesd_circular_buffer_add_entry(&dev->circular_buffer, &dev->write_entry);
         if(add_rtn)
@@ -178,7 +169,6 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     }
 
     exit:
-        //kfree(write_buf);
 	    mutex_unlock(&dev->lock);
         return retval;
 }
