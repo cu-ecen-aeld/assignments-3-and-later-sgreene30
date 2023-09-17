@@ -102,13 +102,15 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     struct aesd_dev *dev = filp->private_data;
     char newline = '\n';
     const char *add_rtn = NULL;
+    bool found_newline = false;
+    int i = 0;
     PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
     /**
      * TODO: handle write
      */
 
      //interruptable mutex
-    PDEBUG("locking mutex");
+    //PDEBUG("locking mutex");
 	if (mutex_lock_interruptible(&dev->lock))
     {
         retval = -ERESTARTSYS;
@@ -116,7 +118,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     }
 	
     //malloc
-    PDEBUG("beginning kmalloc");  
+    //PDEBUG("beginning kmalloc");  
     dev->write_entry.buffptr = krealloc(dev->write_entry.buffptr, dev->write_entry.size + count, GFP_KERNEL);
     if(!dev->write_entry.buffptr)
     {
@@ -126,7 +128,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     }
 
     //get buffer from user space
-    PDEBUG("beginning copy_from_user");
+    //PDEBUG("beginning copy_from_user");
     if(copy_from_user((char *)dev->write_entry.buffptr, buf, count))
     {
         retval = -EFAULT;
@@ -134,12 +136,22 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     }
 
     PDEBUG("User buffer was %s", buf);
-    PDEBUG("Copied buffer was %s", dev->write_entry.buffptr);
+    //PDEBUG("Copied buffer was %s", dev->write_entry.buffptr);
 
     dev->write_entry.size += count;
     retval = count;
 
-    if(strchr(dev->write_entry.buffptr, newline))
+    for(i = 0; i < dev->write_entry.size; i++)
+    {
+        if(dev->write_entry.buffptr[i] == '\n')
+        {
+            found_newline = true;
+            break;
+        }
+    }
+
+    PDEBUG("strchr return: %s", strchr(dev->write_entry.buffptr, newline));
+    if(found_newline)
     {
         PDEBUG("found newline");
 
