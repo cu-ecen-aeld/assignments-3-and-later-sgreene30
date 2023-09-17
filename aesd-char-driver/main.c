@@ -119,7 +119,8 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 	
     //malloc
     //PDEBUG("beginning kmalloc");  
-    dev->write_entry.buffptr = krealloc(dev->write_entry.buffptr, dev->write_entry.size + count, GFP_KERNEL);
+    //dev->write_entry.buffptr = krealloc(dev->write_entry.buffptr, dev->write_entry.size + count, GFP_KERNEL);
+    dev->write_entry.buffptr = krealloc(dev->write_entry.buffptr, dev->write_entry.size, GFP_KERNEL);
     if(!dev->write_entry.buffptr)
     {
         PDEBUG("kmalloc return error");
