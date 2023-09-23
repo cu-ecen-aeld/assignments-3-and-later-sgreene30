@@ -1,6 +1,6 @@
 /*
     Samuel Greene
-    AESD Assignment 6
+    AESD Assignment 9
 */
 
 #include <stdio.h>
@@ -33,11 +33,6 @@ struct thread_struct
     int accept_fd;
 	int thread_complete;
 };
-/*struct timer_thread_data
-{    
-    // a mutex to use when accessing the structure
-    pthread_mutex_t lock;
-};*/
 
 typedef struct slist_data_s slist_data_t;
 struct slist_data_s 
@@ -49,85 +44,6 @@ struct slist_data_s
 
 SLIST_HEAD(slisthead,slist_data_s) head = SLIST_HEAD_INITIALIZER(head);
 pthread_mutex_t lock;
-
-/* timer_thread runs every 10 seconds 
-* Assumes timer_create has configured for sigval.sival_ptr to point to the
-* thread data used for the timer
-*
-* Thread appends timestamp to SOCKDATA file
-*/
-/*static void timer_thread ( union sigval sigval )
-{
-    struct timer_thread_data *td = (struct timer_thread_data*) sigval.sival_ptr;
-    
-    if ( pthread_mutex_lock(&td->lock) != 0 ) {
-        printf("Error %d (%s) locking thread data!\n",errno,strerror(errno));
-    } 
-    else 
-    {
-        time_t curr_time;
-        struct tm *curr_localtime;
-        char timestamp[128];
-        int fd;
-
-        time(&curr_time);
-        curr_localtime = localtime(&curr_time);
-        strftime(timestamp, sizeof(timestamp), "timestamp:%a, %d %b %Y %T %z\n", curr_localtime);
-
-        fd = open(SOCKET_DATA, O_APPEND | O_WRONLY);
-        if(fd == -1)
-        {
-            perror("open failure");
-            return;
-        }
-        lseek(fd, 0, SEEK_END);
-        if(write(fd, timestamp, strlen(timestamp))== -1)
-        {
-            perror("write");
-            return;
-        }
-
-        close(fd);
-
-        if ( pthread_mutex_unlock(&td->lock) != 0 ) {
-            printf("Error %d (%s) unlocking thread data!\n",errno,strerror(errno));
-        }
-    }
-}*/
-
-/**
-* Setup the timer at @param timerid (previously created with timer_create)  
-* using @param clock_id as the clock reference.
-* The time now is saved in @param start_time
-* @return true if the timer could be setup successfuly, false otherwise
-*/
-/*static bool setup_timer( int clock_id,
-                         timer_t timerid,
-                         struct timespec *start_time)
-{
-    bool success = false;
-    if ( clock_gettime(clock_id,start_time) != 0 ) 
-    {
-        syslog(LOG_ERR, "Error %d (%s) getting clock %d time\n",errno,strerror(errno),clock_id);
-    } 
-    else 
-    {
-        struct itimerspec itimerspec;
-        memset(&itimerspec, 0, sizeof(struct itimerspec));
-        itimerspec.it_interval.tv_sec = 10;
-        timespec_add(&itimerspec.it_value,start_time,&itimerspec.it_interval);
-
-        if( timer_settime(timerid, TIMER_ABSTIME, &itimerspec, NULL ) != 0 ) 
-        {
-            syslog(LOG_ERR, "Error %d (%s) setting timer\n",errno,strerror(errno));
-        } 
-        else 
-        {
-            success = true;
-        }
-    }
-    return success;
-}*/
 
 void receive_sock(int socket_fd)
 {
@@ -291,10 +207,6 @@ int main(int argc, char *argv[])
     char client_address[INET6_ADDRSTRLEN];
 	slist_data_t *entry;
 
-    /*struct timer_thread_data ttd;
-    struct sigevent sev;
-    timer_t timerid;*/
-
 	openlog(NULL,0,LOG_USER);
 	syslog(LOG_DEBUG,"starting aesdsocket");	
 	writer_fd = creat(SOCKET_DATA, 0777);
@@ -378,101 +290,63 @@ int main(int argc, char *argv[])
         }
     }
 
-        /*memset(&ttd,0,sizeof(struct timer_thread_data));
-    if ( pthread_mutex_init(&ttd.lock,NULL) != 0 ) {
-        printf("Error %d (%s) initializing thread mutex!\n",errno,strerror(errno));
-    } */
-    //else 
-    //{
-        //int clock_id = CLOCK_MONOTONIC;
-        //memset(&sev,0,sizeof(struct sigevent));
-        /**
-        * Setup a call to timer_thread passing in the ttd structure as the sigev_value
-        * argument
-        */
-        /*sev.sigev_notify = SIGEV_THREAD;
-        sev.sigev_value.sival_ptr = &ttd;
-        sev.sigev_notify_function = timer_thread;
-        if ( timer_create(clock_id,&sev,&timerid) != 0 ) {
-            printf("Error %d (%s) creating timer!\n",errno,strerror(errno));
-        } 
-        else 
+    while(1)
+    {
+        //check to see if signal occured
+        if(caught_signal == true)
         {
-            struct timespec start_time;
-
-            if ( setup_timer(clock_id, timerid, &start_time) ) 
-            {*/
-                while(1)
+            SLIST_FOREACH(entry, &head, entries)
+            {
+                if(entry->th_data.thread_complete == 1)
                 {
-                    //check to see if signal occured
-                    if(caught_signal == true)
-                    {
-                        //timer_delete(timerid);
-                        SLIST_FOREACH(entry, &head, entries)
-                        {
-                            if(entry->th_data.thread_complete == 1)
-                            {
-                                pthread_join(entry->thread_id,NULL);
-                            }
-                            //close connection
-                            close(entry->th_data.accept_fd);
-                        }
-                        //free SLIST
-                        while (!SLIST_EMPTY(&head))
-                        {
-                            entry = SLIST_FIRST(&head);
-                            close(entry->th_data.accept_fd);
-                            SLIST_REMOVE_HEAD(&head, entries);
-                            free(entry);
-                        }
-
-                        close(sock_fd);
-                        unlink(SOCKET_DATA);
-                        closelog();
-                        return 0;
-                    }
-
-                    new_sock_fd = accept(sock_fd, (struct sockaddr *)&client_addr, &addr_size);
-                    if(new_sock_fd == -1)
-                    {
-                        perror("accept failure");
-                        syslog(LOG_ERR, "accept failure");
-                        return -1;
-                    }
-                    else //print client ip to syslog per step 2 part d
-                    {
-                        //get client address and store in string client_address
-                        inet_ntop(client_addr.ss_family,
-                        get_in_addr((struct sockaddr *)&client_addr),
-                        client_address, sizeof client_address);
-                    }
-
-                    process_entry(new_sock_fd);
-                    //join threads that are completed
-                    SLIST_FOREACH(entry, &head, entries)
-                    {
-                        if(entry->th_data.thread_complete == 1)
-                        {
-                            syslog(LOG_DEBUG,"SLIST: Attempting to join thread pointed to by %i",entry->th_data.accept_fd);
-                            pthread_join(entry->thread_id,NULL);
-                            close(entry->th_data.accept_fd);	
-                        }
-                        entry->th_data.thread_complete = 0;
-                    }
+                    pthread_join(entry->thread_id,NULL);
                 }
-            //}
-            /*else
+                //close connection
+                close(entry->th_data.accept_fd);
+            }
+            //free SLIST
+            while (!SLIST_EMPTY(&head))
             {
-                syslog(LOG_ERR, "Failed to setup timer");
-                exit(1);
-            }*/
+                entry = SLIST_FIRST(&head);
+                close(entry->th_data.accept_fd);
+                SLIST_REMOVE_HEAD(&head, entries);
+                free(entry);
+            }
 
-            /*if (timer_delete(timerid) != 0) 
+            close(sock_fd);
+            unlink(SOCKET_DATA);
+            closelog();
+            return 0;
+        }
+
+        new_sock_fd = accept(sock_fd, (struct sockaddr *)&client_addr, &addr_size);
+        if(new_sock_fd == -1)
+        {
+            perror("accept failure");
+            syslog(LOG_ERR, "accept failure");
+            return -1;
+        }
+        else //print client ip to syslog per step 2 part d
+        {
+            //get client address and store in string client_address
+            inet_ntop(client_addr.ss_family,
+            get_in_addr((struct sockaddr *)&client_addr),
+            client_address, sizeof client_address);
+        }
+
+        process_entry(new_sock_fd);
+        //join threads that are completed
+        SLIST_FOREACH(entry, &head, entries)
+        {
+            if(entry->th_data.thread_complete == 1)
             {
-                printf("Error %d (%s) deleting timer!\n",errno,strerror(errno));
-            }*/
-        //}
-    //}
+                syslog(LOG_DEBUG,"SLIST: Attempting to join thread pointed to by %i",entry->th_data.accept_fd);
+                pthread_join(entry->thread_id,NULL);
+                close(entry->th_data.accept_fd);	
+            }
+            entry->th_data.thread_complete = 0;
+        }
+    }
     
     syslog(LOG_DEBUG, "ending aesdsocket");
 	return 0;
