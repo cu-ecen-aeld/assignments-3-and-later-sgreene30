@@ -83,10 +83,13 @@ const char *aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, 
     if(buffer->full)
     {
         buffer->out_offs++;
+        buffer->buffer_size -= buffer->entry[buffer->in_offs].size;
         rtn = buffer->entry[buffer->in_offs].buffptr;
     }
     //add entry into buffer
     buffer->entry[buffer->in_offs] = *add_entry;
+    //adjust total size of buffer
+    buffer->buffer_size += buffer->entry[buffer->in_offs].size;
     //printf("%s", buffer->entry[buffer->in_offs].buffptr);
     buffer->in_offs++;
     if(buffer->in_offs >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED )
