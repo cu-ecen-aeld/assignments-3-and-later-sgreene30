@@ -19,6 +19,8 @@
 #include <linux/fs.h> // file_operations
 #include "aesdchar.h"
 #include <linux/slab.h>
+#include "aesd_ioctl.h"
+
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
 
@@ -177,19 +179,119 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 loff_t aesd_llseek(struct file *filp, loff_t off, int whence)
 {
     struct aesd_dev *dev = filp->private_data;
-    loff_t retval;
+    loff_t retval = -EINVAL;
     
     if (mutex_lock_interruptible(&dev->lock))
     {
         retval = -ERESTARTSYS;
+        goto exit;
     }
 
     retval = fixed_size_llseek(filp, off, whence, dev->circular_buffer.buffer_size);
     
-    mutex_unlock(&dev->lock);
+    goto exit;
 
-    return retval;
+    exit:
+	    mutex_unlock(&dev->lock);
+        return retval;
 }
+
+
+/*
+*   Adjust the file offset (f_pos) parameter of @param filp based on the location specified by
+*   @param write_cmd (the zero referenced command to locate)
+*   and @param write_cmd_offset (the zero referenced offset into the command)
+*   @return 0 if successful, negative if error occured:
+*       -ERESTARTSYS if mutex could not be obtained
+*       -EINVAL if write command or write_cmd_offset was out of range;
+*/
+static long aesd_adjust_file_offset(struct file *filp, unsigned int write_cmd, unsigned int write_cmd_offset)
+{
+    struct aesd_dev *dev = filp->private_data;
+    long retval = -EINVAL;
+    int i;
+    size_t offset = 0;
+
+    
+    if (mutex_lock_interruptible(&dev->lock))
+    {
+        retval = -ERESTARTSYS;
+        goto exit;
+    }
+    //determine if write_cmd is valid when buffer is full
+    if(dev->circular_buffer.full)
+    {
+        if(write_cmd >= 10)
+        {
+            retval = -EINVAL;
+            goto exit;
+        }
+    }
+    else  //determine if write_cmd is valid when buffer is not full
+    {
+        if(write_cmd >= dev->circular_buffer.in_offs)
+        {
+            retval = -EINVAL;
+            goto exit;
+        }
+    }
+    //determine if write_cmd_offset is out of range
+    if(write_cmd_offset >= dev->circular_buffer.entry[write_cmd].size)
+    {
+        retval = -EINVAL;
+        goto exit;
+    }
+
+    for(i=0; i<write_cmd ;i++)
+    {
+        offset += dev->circular_buffer.entry[i].size;
+    }
+    offset += write_cmd_offset; 
+    filp->f_pos = offset;
+    retval = 0;
+
+    goto exit;
+
+    exit:
+	    mutex_unlock(&dev->lock);
+        return retval;
+}
+
+long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+    long retval = -EINVAL;
+    struct aesd_dev *dev = filp->private_data;
+    struct aesd_seekto seekto;
+
+    if (_IOC_TYPE(cmd) != AESD_IOC_MAGIC) return -ENOTTY;
+	if (_IOC_NR(cmd) > AESDCHAR_IOC_MAXNR) return -ENOTTY;
+
+    //AESDCHAR_IOCSEEKTO
+    if(cmd == AESDCHAR_IOCSEEKTO)
+    {
+        if (mutex_lock_interruptible(&dev->lock))
+        {
+            retval = -ERESTARTSYS;
+            goto exit;
+        }
+        if(copy_from_user(&seekto, (const void __user *)arg, sizeof(seekto)) != 0)
+        {
+            retval = EFAULT;
+            goto exit;
+        }
+        else
+        {
+            retval = aesd_adjust_file_offset(filp, seekto.write_cmd, seekto.write_cmd_offset);
+            goto exit;
+        }
+    }
+    goto exit;
+
+    exit:
+        mutex_unlock(&dev->lock);
+        return retval;
+}
+
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
     .read =     aesd_read,
@@ -197,6 +299,7 @@ struct file_operations aesd_fops = {
     .open =     aesd_open,
     .release =  aesd_release,
     .llseek = aesd_llseek,
+    .unlocked_ioctl = aesd_ioctl,
 };
 
 static int aesd_setup_cdev(struct aesd_dev *dev)
