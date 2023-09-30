@@ -63,14 +63,14 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,loff_t *f_po
      * TODO: handle read
      */
 
-    PDEBUG("locking mutex");
+    //PDEBUG("locking mutex");
     if (mutex_lock_interruptible(&dev->lock))
     {
         retval = -ERESTARTSYS;
         goto exit;
     }
 
-    PDEBUG("reading from circular buffer");
+    //PDEBUG("reading from circular buffer");
     read_entry = aesd_circular_buffer_find_entry_offset_for_fpos(&dev->circular_buffer, *f_pos, &find_entry_rtn);
     if(read_entry == NULL)
     {
@@ -79,10 +79,11 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,loff_t *f_po
     }
     retval = read_entry->size - find_entry_rtn;
 
-    PDEBUG("copy_to_user");
+    //PDEBUG("copy_to_user");
     if(copy_to_user(buf, (char *)read_entry->buffptr, retval) == 0)
     {
         *f_pos += retval;
+        PDEBUG("Copied buffer was %s", buf);
     }
     else
     {
@@ -136,7 +137,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         retval = -EFAULT;
         goto exit;
     }
-    PDEBUG("User buffer was %s", buf);
+    //PDEBUG("User buffer was %s", buf);
     PDEBUG("Copied buffer was %s", dev->write_entry.buffptr);
 
     dev->write_entry.size += count;
@@ -155,15 +156,15 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
     if(found_newline)
     {
-        PDEBUG("found newline");
-        PDEBUG("adding entry to circular_buffer");
+        //PDEBUG("found newline");
+        //PDEBUG("adding entry to circular_buffer");
         add_rtn = aesd_circular_buffer_add_entry(&dev->circular_buffer, &dev->write_entry);
         if(add_rtn)
         {
             kfree(add_rtn);
         }
 
-        PDEBUG("resetting entry");
+        //PDEBUG("resetting entry");
         dev->write_entry.size = 0;
         dev->write_entry.buffptr = NULL;
     }
