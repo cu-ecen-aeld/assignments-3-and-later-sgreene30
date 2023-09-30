@@ -143,6 +143,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     retval = count;
     *f_pos += retval;
 
+    //search for newline
     for(i = 0; i < dev->write_entry.size; i++)
     {
         if(dev->write_entry.buffptr[i] == '\n')
@@ -180,7 +181,8 @@ loff_t aesd_llseek(struct file *filp, loff_t off, int whence)
 {
     struct aesd_dev *dev = filp->private_data;
     loff_t retval = -EINVAL;
-    
+    PDEBUG("llseek begin");
+
     if (mutex_lock_interruptible(&dev->lock))
     {
         retval = -ERESTARTSYS;
@@ -212,6 +214,7 @@ static long aesd_adjust_file_offset(struct file *filp, unsigned int write_cmd, u
     int i;
     size_t offset = 0;
 
+    PDEBUG("aesd_adjust_file_offset begin");
     
     if (mutex_lock_interruptible(&dev->lock))
     {
@@ -244,6 +247,8 @@ static long aesd_adjust_file_offset(struct file *filp, unsigned int write_cmd, u
 
     for(i=0; i<write_cmd ;i++)
     {
+        PDEBUG("i:%d", i);
+        PDEBUG("write_cmd:%d", write_cmd);
         offset += dev->circular_buffer.entry[i].size;
     }
     offset += write_cmd_offset; 
@@ -259,9 +264,11 @@ static long aesd_adjust_file_offset(struct file *filp, unsigned int write_cmd, u
 
 long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
+    
     long retval = -EINVAL;
-    struct aesd_dev *dev = filp->private_data;
+    //struct aesd_dev *dev = filp->private_data;
     struct aesd_seekto seekto;
+    PDEBUG("ioctl begin");
 
     if (_IOC_TYPE(cmd) != AESD_IOC_MAGIC) return -ENOTTY;
 	if (_IOC_NR(cmd) > AESDCHAR_IOC_MAXNR) return -ENOTTY;
@@ -269,11 +276,11 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     //AESDCHAR_IOCSEEKTO
     if(cmd == AESDCHAR_IOCSEEKTO)
     {
-        if (mutex_lock_interruptible(&dev->lock))
+        /*if (mutex_lock_interruptible(&dev->lock))
         {
             retval = -ERESTARTSYS;
             goto exit;
-        }
+        }*/
         if(copy_from_user(&seekto, (const void __user *)arg, sizeof(seekto)) != 0)
         {
             retval = EFAULT;
@@ -288,7 +295,7 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     goto exit;
 
     exit:
-        mutex_unlock(&dev->lock);
+        //mutex_unlock(&dev->lock);
         return retval;
 }
 
