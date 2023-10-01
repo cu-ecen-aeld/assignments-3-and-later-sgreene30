@@ -80,7 +80,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,loff_t *f_po
     retval = read_entry->size - find_entry_rtn;
     PDEBUG("circular buffer working entry was %s", read_entry->buffptr);
     //PDEBUG("copy_to_user");
-    if(copy_to_user(buf, (char *)read_entry->buffptr, retval) == 0)
+    if(copy_to_user(buf, (char *)read_entry->buffptr + find_entry_rtn, retval) == 0)
     {
         *f_pos += retval;
         PDEBUG("User space value was %s", buf);
