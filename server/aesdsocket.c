@@ -20,6 +20,7 @@
 #include <pthread.h>
 #include <time.h>
 #include "time_functions_shared.h"
+#include "../aesd-char-driver/aesd_ioctl.h"
 
 #define PORT "9000"
 #define BACKLOG 20
@@ -45,7 +46,85 @@ struct slist_data_s
 SLIST_HEAD(slisthead,slist_data_s) head = SLIST_HEAD_INITIALIZER(head);
 pthread_mutex_t lock;
 
-void receive_sock(int socket_fd)
+void process_data(int socket_fd)
+{
+    size_t recv_rc, packet_size;
+    char *buf = malloc(BUF_LEN);
+    bool end_flag = false;
+    FILE *file;
+    int next_char;
+    char c;
+    int sscanf_nargs = 0;
+    struct aesd_seekto seekto;
+    bool write_to_buf = true;
+
+
+    packet_size = 0;
+    recv_rc = 0;
+    while(!end_flag)
+    {
+        recv_rc = recv(socket_fd, buf + packet_size, BUF_LEN, 0);
+        if(recv_rc == -1)
+        {
+            perror("recv failure");
+            syslog(LOG_ERR, "recv failure");
+            return;
+        }
+
+        packet_size += recv_rc;
+        buf = realloc(buf, packet_size + BUF_LEN);
+        memset(buf + packet_size,0,BUF_LEN);
+        
+        if(strchr(buf, '\n') != NULL)
+        {
+            end_flag = true;
+        }
+    }
+
+    if(pthread_mutex_lock(&lock) != 0){
+        perror("mutex lock fail");}
+
+    file = fopen(SOCKET_DATA, "a+");
+
+    //check to see if command ioctl is sent
+    sscanf_nargs = sscanf(buf, "AESDCHAR_IOCSEEKTO:%d,%d", &seekto.write_cmd, &seekto.write_cmd_offset);
+    
+    if(sscanf_nargs == 2)
+    {
+        ioctl(fileno(file), AESDCHAR_IOCSEEKTO, &seekto.write_cmd, &seekto.write_cmd_offset);
+        write_to_buf = false;
+    }
+
+    if(write_to_buf)
+    {
+        fwrite(buf, 1, packet_size, file);
+        rewind(file);
+    }
+
+    free(buf);
+
+    while(1) //individually print characters of all previous packets
+    {
+        next_char = fgetc(file);
+        if(next_char == EOF)
+        {
+            break;
+        }
+        c = next_char;
+        if(send(socket_fd, &c, 1, 0) == -1)
+        {
+            perror("send failure");
+            syslog(LOG_ERR, "recv failure");
+            return;
+        }
+    }
+    fclose(file);
+    if(pthread_mutex_unlock(&lock) != 0){
+    perror("mutex lock fail");}
+
+}
+
+/*void receive_sock(int socket_fd)
 {
     int recv_rc;
     char buf[BUF_LEN];
@@ -64,6 +143,7 @@ void receive_sock(int socket_fd)
 
         if(pthread_mutex_lock(&lock) != 0){
         perror("mutex lock fail");}
+        
 
         writer_fd = open(SOCKET_DATA, O_APPEND | O_WRONLY);
         if(writer_fd == -1)
@@ -130,7 +210,7 @@ void send_sock(int local_accept_rc)
         perror("mutex lock fail");}
 
     return;
-}
+}*/
 
 static void signal_handler(int sig_num)
 {
@@ -149,9 +229,10 @@ void *socket_thread(void *input_args)
 {
 	struct thread_struct *in_args = input_args;
 
-	receive_sock(in_args->accept_fd);//receive data on socket
-	send_sock(in_args->accept_fd); //send all received data
-	in_args->thread_complete = 1; //set complete flag
+	//receive_sock(in_args->accept_fd);//receive data on socket
+	//send_sock(in_args->accept_fd); //send all received data
+	process_data(in_args->accept_fd);
+    in_args->thread_complete = 1; //set complete flag
 	return input_args;
 }
 

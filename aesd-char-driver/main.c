@@ -78,12 +78,12 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,loff_t *f_po
         goto exit;
     }
     retval = read_entry->size - find_entry_rtn;
-    PDEBUG("circular buffer working entry was %s", read_entry->buffptr);
+    //PDEBUG("circular buffer working entry was %s", read_entry->buffptr);
     //PDEBUG("copy_to_user");
     if(copy_to_user(buf, (char *)read_entry->buffptr + find_entry_rtn, retval) == 0)
     {
         *f_pos += retval;
-        PDEBUG("User space value was %s", buf);
+        //PDEBUG("User space value was %s", buf);
     }
     else
     {
@@ -125,7 +125,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     dev->write_entry.buffptr = krealloc(dev->write_entry.buffptr, dev->write_entry.size + count, GFP_KERNEL);
     if(!dev->write_entry.buffptr)
     {
-        PDEBUG("kmalloc return error");
+        //PDEBUG("kmalloc return error");
         retval = -EFAULT; 
         goto exit;
     }
@@ -137,7 +137,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         retval = -EFAULT;
         goto exit;
     }
-    PDEBUG("User buffer was %s", buf);
+    //PDEBUG("User buffer was %s", buf);
     //PDEBUG("Copied buffer was %s", dev->write_entry.buffptr);
 
     dev->write_entry.size += count;
