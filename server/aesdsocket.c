@@ -124,94 +124,6 @@ void process_data(int socket_fd)
 
 }
 
-/*void receive_sock(int socket_fd)
-{
-    int recv_rc;
-    char buf[BUF_LEN];
-    bool end_flag = false;
-    int writer_fd;
-
-    while(!end_flag)
-    {
-        recv_rc = recv(socket_fd, buf, BUF_LEN, 0);
-        if(recv_rc == -1)
-        {
-            perror("recv failure");
-            syslog(LOG_ERR, "recv failure");
-            return;
-        }
-
-        if(pthread_mutex_lock(&lock) != 0){
-        perror("mutex lock fail");}
-        
-
-        writer_fd = open(SOCKET_DATA, O_APPEND | O_WRONLY);
-        if(writer_fd == -1)
-        {
-            perror("open failure");
-            return;
-        }
-
-        if(write(writer_fd, buf, recv_rc)== -1)
-        {
-            perror("write");
-            syslog(LOG_ERR, "write failure");
-            return;
-        }
-
-        close(writer_fd);
-
-        if(pthread_mutex_unlock(&lock) != 0){
-        perror("mutex lock fail");}
-
-
-        if(strchr(buf, '\n') != NULL)
-        {
-            end_flag = true;
-        }
-    }
-
-}
-
-void send_sock(int local_accept_rc)
-{
-    FILE *file;
-    int next_char;
-    char c;
-
-    if(pthread_mutex_lock(&lock) != 0){
-        perror("mutex lock fail");}
-
-    file = fopen(SOCKET_DATA, "rb"); //open file for appending packets
-    if(file == NULL)
-    {
-        perror("fopen failure");
-        return;
-    }
-
-    while(1) //individually print characters of all previous packets
-    {
-        next_char = fgetc(file);
-        if(next_char == EOF)
-        {
-            break;
-        }
-        c = next_char;
-        if(send(local_accept_rc, &c, 1, 0) == -1)
-        {
-            perror("send failure");
-            syslog(LOG_ERR, "recv failure");
-            return;
-        }
-    }
-    fclose(file);
-
-    if(pthread_mutex_unlock(&lock) != 0){
-        perror("mutex lock fail");}
-
-    return;
-}*/
-
 static void signal_handler(int sig_num)
 {
     if(sig_num == SIGINT)
@@ -229,8 +141,6 @@ void *socket_thread(void *input_args)
 {
 	struct thread_struct *in_args = input_args;
 
-	//receive_sock(in_args->accept_fd);//receive data on socket
-	//send_sock(in_args->accept_fd); //send all received data
 	process_data(in_args->accept_fd);
     in_args->thread_complete = 1; //set complete flag
 	return input_args;

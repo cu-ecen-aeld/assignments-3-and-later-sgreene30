@@ -268,7 +268,6 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
     
     long retval = -EINVAL;
-    //struct aesd_dev *dev = filp->private_data;
     struct aesd_seekto seekto;
     PDEBUG("ioctl begin");
 
@@ -278,11 +277,6 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     //AESDCHAR_IOCSEEKTO
     if(cmd == AESDCHAR_IOCSEEKTO)
     {
-        /*if (mutex_lock_interruptible(&dev->lock))
-        {
-            retval = -ERESTARTSYS;
-            goto exit;
-        }*/
         if(copy_from_user(&seekto, (const void __user *)arg, sizeof(seekto)) != 0)
         {
             retval = EFAULT;
@@ -297,7 +291,6 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     goto exit;
 
     exit:
-        //mutex_unlock(&dev->lock);
         return retval;
 }
 
